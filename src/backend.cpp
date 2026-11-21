@@ -36,20 +36,27 @@ void Backend::recordRescue() {
     ++m_rescues;
     emit rescuesChanged();
     addScore(500);
-    setStatusMessage(QStringLiteral("HERO RESCUE! +500"));
+    setStatusMessage(QStringLiteral("PARATROOPER RESCUED! +500"));
 }
 
 void Backend::recordPlaneDestroyed() {
     ++m_planesDestroyed;
     emit planesDestroyedChanged();
-    addScore(100);
+    addScore(150);
+}
+
+void Backend::recordShipDestroyed() {
+    ++m_shipsDestroyed;
+    emit shipsDestroyedChanged();
+    addScore(800);
+    setStatusMessage(QStringLiteral("WARSHIP SUNK! +800"));
 }
 
 void Backend::recordMothershipDefeated() {
     ++m_mothershipsDefeated;
     emit mothershipsDefeatedChanged();
     addScore(2500);
-    setStatusMessage(QStringLiteral("MOTHERSHIP DOWN! +2500"));
+    setStatusMessage(QStringLiteral("MOTHERSHIP DESTROYED! +2500"));
     nextWave();
 }
 
@@ -68,16 +75,18 @@ void Backend::resetGame() {
     m_score = 0;
     m_rescues = 0;
     m_planesDestroyed = 0;
+    m_shipsDestroyed = 0;
     m_mothershipsDefeated = 0;
     m_wave = 1;
     m_paused = false;
     emit scoreChanged();
     emit rescuesChanged();
     emit planesDestroyedChanged();
+    emit shipsDestroyedChanged();
     emit mothershipsDefeatedChanged();
     emit waveChanged();
     emit pausedChanged();
-    setStatusMessage(QStringLiteral("READY TO FLY!"));
+    setStatusMessage(QStringLiteral("B-2 SPIRIT AIRBORNE!"));
 }
 
 void Backend::setStatusMessage(const QString &msg) {

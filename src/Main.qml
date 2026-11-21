@@ -5,13 +5,13 @@ import QtQuick.Layouts
 
 ApplicationWindow {
     id: win
-    width: 1024
-    height: 720
-    minimumWidth: 800
+    width: 1100
+    height: 740
+    minimumWidth: 840
     minimumHeight: 600
     visible: true
     title: qsTr("Sky Strike")
-    color: "#0a0c16"
+    color: "#090d16"
 
     Material.theme: Material.Dark
     Material.accent: theme.accent
@@ -21,14 +21,14 @@ ApplicationWindow {
 
     Shortcut { sequence: "?"; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
     Shortcut { sequence: "Q"; context: Qt.ApplicationShortcut; onActivated: Qt.quit() }
-    Shortcut { sequence: "Space"; context: Qt.ApplicationShortcut; onActivated: root.firePlayerMissiles() }
+    Shortcut { sequence: "Space"; context: Qt.ApplicationShortcut; onActivated: root.fireAllOrdnance() }
+    Shortcut { sequence: "B"; context: Qt.ApplicationShortcut; onActivated: root.dropCarpetBombs() }
     Shortcut { sequence: "P"; context: Qt.ApplicationShortcut; onActivated: backend.togglePause() }
 
-    // Connect backend primary action (e.g. from tests or external trigger)
     Connections {
         target: backend
         function onFireTriggerChanged() {
-            root.firePlayerMissiles();
+            root.fireAllOrdnance();
         }
     }
 
@@ -38,91 +38,93 @@ ApplicationWindow {
         LayoutMirroring.enabled: Qt.application.layoutDirection === Qt.RightToLeft
         LayoutMirroring.childrenInherit: true
 
-        // --- GAME STATE ---
-        property real playerX: 160
-        property real playerY: 360
-        property real targetX: 160
-        property real targetY: 360
+        // --- PLAYER B-2 SPIRIT STATE ---
+        property real playerX: 200
+        property real playerY: 250
+        property real targetX: 200
+        property real targetY: 250
         property real playerTilt: 0
-        property real shieldEnergy: 100
-        property bool shieldActive: false
+        property real playerBank: 0
+        property int bombBayOpenTicks: 0
         property int invulnerableTicks: 0
+        property real shakeIntensity: 0
+        property real seaTime: 0
 
-        // Mothership (Giant Airplane)
-        property real bossX: win.width + 100
-        property real bossY: 140
-        property real bossVx: -1.2
-        property real bossHealth: 100
-        property real bossMaxHealth: 100
+        // --- GIANT AIRBORNE CARRIER / MOTHERSHIP ---
+        property real bossX: win.width - 220
+        property real bossY: 135
+        property real bossVx: -1.1
+        property real bossHealth: 140
+        property real bossMaxHealth: 140
         property bool bossHangarOpen: false
         property int bossSpawnTimer: 0
         property bool bossActive: true
 
-        // Entities arrays
+        // --- DYNAMIC ENTITIES ---
         property var smallPlanes: []
+        property var warships: []
         property var paratroopers: []
         property var missiles: []
+        property var bombs: []
         property var particles: []
+        property var shockwaves: []
+        property var splashes: []
         property var floatingTexts: []
-
-        // Cityscape building generation
-        property var cityscapeFar: []
-        property var cityscapeNear: []
         property var clouds: []
 
-        function initBackground() {
-            var far = [];
-            var near = [];
-            var w = 0;
-            // Generate far skyline
-            while (w < 1600) {
-                var bw = 40 + Math.random() * 50;
-                var bh = 140 + Math.random() * 160;
-                far.push({ x: w, w: bw, h: bh, color: "#161b30" });
-                w += bw - 2;
-            }
-            cityscapeFar = far;
+        readonly property real seaLevel: win.height - 105
 
-            // Generate near skyline with glowing windows
-            w = 0;
-            while (w < 1600) {
-                var bw2 = 50 + Math.random() * 70;
-                var bh2 = 90 + Math.random() * 140;
-                var windows = [];
-                for (var r = 10; r < bh2 - 20; r += 18) {
-                    for (var c = 8; c < bw2 - 12; c += 14) {
-                        if (Math.random() > 0.35) {
-                            windows.push({ rx: c, ry: r, on: Math.random() > 0.4 });
-                        }
-                    }
-                }
-                near.push({ x: w, w: bw2, h: bh2, color: "#20263f", windows: windows, antenna: Math.random() > 0.5 });
-                w += bw2 + 4;
-            }
-            cityscapeNear = near;
-
-            // Floating clouds
+        function initEnvironment() {
             clouds = [
-                { x: 100, y: 80, s: 1.0, speed: 0.6 },
-                { x: 450, y: 150, s: 0.8, speed: 0.4 },
-                { x: 800, y: 60, s: 1.2, speed: 0.7 },
-                { x: 1200, y: 110, s: 0.9, speed: 0.5 }
+                { x: 120, y: 85, s: 1.1, speed: 0.45, dark: true },
+                { x: 460, y: 145, s: 0.9, speed: 0.35, dark: false },
+                { x: 780, y: 70, s: 1.3, speed: 0.55, dark: true },
+                { x: 1080, y: 120, s: 1.0, speed: 0.40, dark: false }
             ];
+
+            // Initial enemy warships on the sea
+            warships = [];
+            spawnWarship(win.width * 0.45, "destroyer");
+            spawnWarship(win.width * 0.78, "carrier");
+            spawnWarship(win.width * 1.08, "cruiser");
+
+            // Initial enemy fighter planes & paratroopers so action starts immediately
+            smallPlanes = [];
+            spawnSmallPlane(win.width * 0.65, 190);
+            spawnSmallPlane(win.width * 0.80, 260);
+            spawnParatrooper(win.width * 0.55, 220);
         }
 
         Component.onCompleted: {
-            initBackground();
+            initEnvironment();
+        }
+
+        function spawnWarship(startX, type) {
+            var isCarrier = (type === "carrier");
+            var isCruiser = (type === "cruiser");
+            warships.push({
+                x: startX,
+                y: root.seaLevel,
+                vx: -(0.55 + Math.random() * 0.45),
+                type: type || (Math.random() > 0.6 ? "carrier" : (Math.random() > 0.5 ? "cruiser" : "destroyer")),
+                w: isCarrier ? 190 : (isCruiser ? 150 : 125),
+                h: isCarrier ? 44 : (isCruiser ? 38 : 32),
+                hp: isCarrier ? 6 : (isCruiser ? 4 : 3),
+                maxHp: isCarrier ? 6 : (isCruiser ? 4 : 3),
+                sinking: false,
+                sinkDepth: 0,
+                sinkAngle: 0,
+                aaTimer: Math.floor(Math.random() * 100)
+            });
         }
 
         function spawnSmallPlane(originX, originY) {
             smallPlanes.push({
                 x: originX,
                 y: originY,
-                vx: -(2.5 + Math.random() * 2.0),
-                vy: (Math.random() - 0.5) * 1.5,
-                angle: 0,
-                hp: 1,
-                timer: 0
+                vx: -(2.8 + Math.random() * 2.0),
+                vy: (Math.random() - 0.5) * 1.6,
+                timer: Math.random() * 6.28
             });
         }
 
@@ -130,26 +132,87 @@ ApplicationWindow {
             paratroopers.push({
                 x: originX,
                 y: originY,
-                vy: 0.9 + Math.random() * 0.5,
+                vy: 0.85 + Math.random() * 0.45,
                 sway: Math.random() * 6.28,
-                color: ["#f7768e", "#7aa2f7", "#e0af68", "#9ece6a", "#bb9af7"][Math.floor(Math.random() * 5)]
+                color: ["#e0af68", "#9ece6a", "#7aa2f7", "#f7768e", "#ff9e64"][Math.floor(Math.random() * 5)]
             });
         }
 
-        function spawnExplosion(x, y, big) {
-            var count = big ? 28 : 14;
-            for (var i = 0; i < count; ++i) {
-                var spd = (big ? 3.0 : 2.0) * (0.5 + Math.random());
-                var ang = Math.random() * 6.283;
-                particles.push({
+        // Dramatic multi-stage explosion with shockwave ring, white-hot flash, fireballs, dark smoke, and screen shake
+        function spawnDramaticExplosion(x, y, scale, isNaval) {
+            root.shakeIntensity = Math.min(22, root.shakeIntensity + 7 * scale);
+
+            // Supersonic shockwave ring
+            shockwaves.push({
+                x: x,
+                y: y,
+                radius: 6,
+                maxRadius: 65 * scale,
+                alpha: 0.95,
+                width: 4.5 * scale,
+                color: isNaval ? "#ffd60a" : "#ffffff"
+            });
+
+            // Secondary outer blast wave for huge explosions
+            if (scale >= 1.4) {
+                shockwaves.push({
                     x: x,
                     y: y,
-                    vx: Math.cos(ang) * spd,
-                    vy: Math.sin(ang) * spd,
+                    radius: 2,
+                    maxRadius: 95 * scale,
+                    alpha: 0.75,
+                    width: 2.5 * scale,
+                    color: "#ff9e64"
+                });
+            }
+
+            // White-hot core flash
+            particles.push({
+                x: x,
+                y: y,
+                vx: 0,
+                vy: 0,
+                life: 1.0,
+                decay: 0.12,
+                color: "#ffffff",
+                size: 28 * scale,
+                smoke: false
+            });
+
+            // Rolling fireballs & dark war smoke
+            var count = Math.floor(26 * scale);
+            for (var i = 0; i < count; ++i) {
+                var spd = (1.5 + Math.random() * 4.5) * scale;
+                var ang = Math.random() * 6.283;
+                var isSmoke = (i % 3 === 0);
+                particles.push({
+                    x: x + (Math.random() - 0.5) * 12 * scale,
+                    y: y + (Math.random() - 0.5) * 12 * scale,
+                    vx: Math.cos(ang) * (isSmoke ? spd * 0.55 : spd),
+                    vy: Math.sin(ang) * (isSmoke ? spd * 0.55 : spd) - (isSmoke ? 0.6 : 0),
                     life: 1.0,
-                    decay: 0.03 + Math.random() * 0.04,
-                    color: ["#ff9e64", "#f7768e", "#ffd60a", "#7aa2f7"][Math.floor(Math.random() * 4)],
-                    size: (big ? 6 : 3) + Math.random() * 4
+                    decay: isSmoke ? (0.015 + Math.random() * 0.015) : (0.028 + Math.random() * 0.03),
+                    color: isSmoke ? "#262b36" : ["#ffd60a", "#ff9e64", "#ff4d4d", "#f7768e"][Math.floor(Math.random() * 4)],
+                    size: (isSmoke ? 12 : 7) * scale * (0.6 + Math.random() * 0.7),
+                    smoke: isSmoke
+                });
+            }
+
+            if (isNaval) {
+                spawnWaterSplash(x, root.seaLevel, 1.5 * scale);
+            }
+        }
+
+        function spawnWaterSplash(x, y, scale) {
+            var drops = Math.floor(18 * scale);
+            for (var i = 0; i < drops; ++i) {
+                splashes.push({
+                    x: x + (Math.random() - 0.5) * 24 * scale,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 3.5 * scale,
+                    vy: -(3.5 + Math.random() * 5.5) * scale,
+                    life: 1.0,
+                    size: (3 + Math.random() * 4.5) * scale
                 });
             }
         }
@@ -159,44 +222,70 @@ ApplicationWindow {
                 text: text,
                 x: x,
                 y: y,
-                vy: -1.2,
+                vy: -1.4,
                 alpha: 1.0,
                 color: color || theme.accent
             });
         }
 
-        function firePlayerMissiles() {
+        // Fires both a big Cruise Missile forward AND drops a heavy gravity bomb downward
+        function fireAllOrdnance() {
             if (backend.paused) return;
+            root.bombBayOpenTicks = 24;
 
-            // Dual wing missiles
+            // 1. Heavy Cruise Missile (forward)
             missiles.push({
-                x: playerX + 30,
-                y: playerY - 12,
-                vx: 8.5,
-                vy: -0.4,
-                life: 120
-            });
-            missiles.push({
-                x: playerX + 30,
-                y: playerY + 12,
-                vx: 8.5,
-                vy: 0.4,
-                life: 120
+                x: playerX + 26,
+                y: playerY + 4,
+                vx: 5.5,
+                ax: 0.35,
+                vy: 0,
+                life: 140
             });
 
-            // Thruster fire spark
-            for (var i = 0; i < 4; ++i) {
+            // 2. Heavy Gravity Bomb (drops from B-2 Spirit internal bomb bay onto planes & ships below)
+            bombs.push({
+                x: playerX - 4,
+                y: playerY + 14,
+                vx: 2.2,
+                vy: 1.8,
+                gravity: 0.22,
+                angle: 0.4,
+                life: 200
+            });
+
+            // Launch flash particles under bomb bay
+            for (var i = 0; i < 6; ++i) {
                 particles.push({
-                    x: playerX - 25,
-                    y: playerY + (Math.random() - 0.5) * 8,
-                    vx: -(3 + Math.random() * 3),
-                    vy: (Math.random() - 0.5) * 1.5,
-                    life: 1.0,
+                    x: playerX + 10,
+                    y: playerY + 10,
+                    vx: -(2 + Math.random() * 3),
+                    vy: (Math.random() - 0.5) * 2,
+                    life: 0.9,
                     decay: 0.08,
-                    color: "#ff9e64",
-                    size: 4
+                    color: "#ffd60a",
+                    size: 5,
+                    smoke: false
                 });
             }
+        }
+
+        // Drops a dramatic 4-bomb carpet bombing salvo from the B-2 Spirit
+        function dropCarpetBombs() {
+            if (backend.paused) return;
+            root.bombBayOpenTicks = 38;
+            for (var b = 0; b < 4; ++b) {
+                bombs.push({
+                    x: playerX - 16 + b * 12,
+                    y: playerY + 14 + b * 4,
+                    vx: 1.6 + b * 0.45,
+                    vy: 1.5 + b * 0.35,
+                    gravity: 0.22,
+                    angle: 0.4,
+                    life: 220
+                });
+            }
+            addFloatingText("BOMBS AWAY!", playerX, playerY - 30, "#ff9e64");
         }
 
         // --- MAIN 60FPS GAME LOOP ---
@@ -206,94 +295,138 @@ ApplicationWindow {
             running: !backend.paused
             repeat: true
             onTriggered: {
-                // 1. Player movement toward target with smooth easing
-                var dx = root.targetX - root.playerX;
-                var dy = root.targetY - root.playerY;
-                root.playerX += dx * 0.15;
-                root.playerY += dy * 0.15;
-                // Tilt based on vertical velocity
-                root.playerTilt = Math.max(-0.4, Math.min(0.4, dy * 0.02));
+                root.seaTime += 0.045;
+                if (root.shakeIntensity > 0.2)
+                    root.shakeIntensity *= 0.86;
+                else
+                    root.shakeIntensity = 0;
 
+                if (root.bombBayOpenTicks > 0)
+                    root.bombBayOpenTicks--;
                 if (root.invulnerableTicks > 0)
                     root.invulnerableTicks--;
 
-                // 2. Cityscape scroll
-                for (var ci = 0; ci < root.cityscapeFar.length; ++ci) {
-                    root.cityscapeFar[ci].x -= 0.4;
-                    if (root.cityscapeFar[ci].x + root.cityscapeFar[ci].w < 0) {
-                        root.cityscapeFar[ci].x = win.width + Math.random() * 20;
-                    }
-                }
-                for (var ni = 0; ni < root.cityscapeNear.length; ++ni) {
-                    root.cityscapeNear[ni].x -= 0.8;
-                    if (root.cityscapeNear[ni].x + root.cityscapeNear[ni].w < 0) {
-                        root.cityscapeNear[ni].x = win.width + Math.random() * 20;
-                    }
-                }
-                // Clouds scroll
+                // 1. B-2 Spirit smooth flight above sea level
+                var clampedTargetY = Math.min(root.targetY, root.seaLevel - 75);
+                var dx = root.targetX - root.playerX;
+                var dy = clampedTargetY - root.playerY;
+                root.playerX += dx * 0.14;
+                root.playerY += dy * 0.14;
+                root.playerTilt = Math.max(-0.32, Math.min(0.32, dy * 0.015));
+                root.playerBank = Math.max(-0.25, Math.min(0.25, dx * 0.01));
+
+                // 2. Clouds scroll
                 for (var cli = 0; cli < root.clouds.length; ++cli) {
                     root.clouds[cli].x -= root.clouds[cli].speed;
-                    if (root.clouds[cli].x < -200)
-                        root.clouds[cli].x = win.width + 50;
+                    if (root.clouds[cli].x < -220)
+                        root.clouds[cli].x = win.width + 80;
                 }
 
                 // 3. Giant Mothership logic
                 if (root.bossActive) {
                     root.bossX += root.bossVx;
-                    root.bossY += Math.sin(Date.now() / 800) * 0.4;
+                    root.bossY = 125 + Math.sin(root.seaTime * 0.7) * 18;
 
-                    // Reverse direction when crossing
-                    if (root.bossX < win.width * 0.55 && root.bossVx < 0) {
-                        root.bossVx = 0.8;
-                    } else if (root.bossX > win.width - 150 && root.bossVx > 0) {
-                        root.bossVx = -0.8;
-                    }
+                    if (root.bossX < win.width * 0.48 && root.bossVx < 0)
+                        root.bossVx = 0.85;
+                    else if (root.bossX > win.width - 170 && root.bossVx > 0)
+                        root.bossVx = -0.85;
 
-                    // Open hangar bay and spawn small planes
                     root.bossSpawnTimer++;
-                    if (root.bossSpawnTimer % 90 === 0) {
+                    if (root.bossSpawnTimer % 85 === 0) {
                         root.bossHangarOpen = true;
-                        root.spawnSmallPlane(root.bossX + 20, root.bossY + 25);
-                        // Chance to drop soldiers
-                        if (Math.random() > 0.4) {
-                            root.spawnParatrooper(root.bossX + 40, root.bossY + 30);
-                            root.spawnParatrooper(root.bossX + 60, root.bossY + 30);
+                        root.spawnSmallPlane(root.bossX - 20, root.bossY + 24);
+                        if (Math.random() > 0.35) {
+                            root.spawnParatrooper(root.bossX + 25, root.bossY + 28);
+                            root.spawnParatrooper(root.bossX + 50, root.bossY + 28);
                         }
-                    } else if (root.bossSpawnTimer % 90 === 30) {
+                    } else if (root.bossSpawnTimer % 85 === 30) {
                         root.bossHangarOpen = false;
                     }
                 } else {
-                    // Respawn a new wave of boss
-                    if (Math.random() < 0.008) {
+                    if (Math.random() < 0.009) {
                         root.bossActive = true;
-                        root.bossX = win.width + 120;
-                        root.bossY = 120 + Math.random() * 80;
-                        root.bossVx = -1.2;
-                        root.bossMaxHealth = 100 + backend.wave * 30;
+                        root.bossX = win.width + 130;
+                        root.bossY = 125;
+                        root.bossVx = -1.1;
+                        root.bossMaxHealth = 140 + backend.wave * 35;
                         root.bossHealth = root.bossMaxHealth;
                         backend.setStatusMessage(qsTr("Big Mothership Detected!"));
                     }
                 }
 
-                // 4. Small planes update
+                // 4. Enemy Warships in the sea below
+                var nextShips = [];
+                for (var wsi = 0; wsi < root.warships.length; ++wsi) {
+                    var sh = root.warships[wsi];
+                    sh.x += sh.vx;
+
+                    if (sh.sinking) {
+                        sh.sinkDepth += 0.75;
+                        sh.sinkAngle += (sh.type === "carrier" ? 0.006 : -0.008);
+                        if (Math.random() < 0.35) {
+                            root.particles.push({
+                                x: sh.x + (Math.random() - 0.5) * sh.w * 0.5,
+                                y: root.seaLevel - 5,
+                                vx: (Math.random() - 0.5) * 0.8,
+                                vy: -(0.8 + Math.random() * 1.2),
+                                life: 0.9,
+                                decay: 0.02,
+                                color: "#262b36",
+                                size: 9 + Math.random() * 6,
+                                smoke: true
+                            });
+                        }
+                        if (sh.sinkDepth < 65)
+                            nextShips.push(sh);
+                        continue;
+                    }
+
+                    // Damaged ships emit burning fire and dark smoke
+                    if (sh.hp < sh.maxHp && Math.random() < 0.3) {
+                        root.particles.push({
+                            x: sh.x + (Math.random() - 0.5) * sh.w * 0.4,
+                            y: root.seaLevel - sh.h * 0.6,
+                            vx: -0.4,
+                            vy: -(1.0 + Math.random() * 1.2),
+                            life: 0.85,
+                            decay: 0.025,
+                            color: (Math.random() > 0.4) ? "#222630" : "#ff6b35",
+                            size: 7 + Math.random() * 5,
+                            smoke: true
+                        });
+                    }
+
+                    if (sh.x > -sh.w - 40)
+                        nextShips.push(sh);
+                }
+                root.warships = nextShips;
+
+                // Keep fleet populated on the wartime sea
+                if (root.warships.length < 3 && Math.random() < 0.02) {
+                    var types = ["destroyer", "cruiser", "carrier"];
+                    root.spawnWarship(win.width + 140, types[Math.floor(Math.random() * 3)]);
+                }
+
+                // 5. Small enemy planes update
                 var nextPlanes = [];
                 for (var spi = 0; spi < root.smallPlanes.length; ++spi) {
                     var sp = root.smallPlanes[spi];
                     sp.x += sp.vx;
-                    sp.y += sp.vy + Math.sin((sp.timer += 0.08)) * 0.9;
+                    sp.timer += 0.07;
+                    sp.y += sp.vy + Math.sin(sp.timer) * 0.9;
+                    sp.y = Math.max(70, Math.min(root.seaLevel - 65, sp.y));
 
-                    // Drop paratroopers occasionally
-                    if (Math.random() < 0.012 && sp.x > 150 && sp.x < win.width - 50) {
-                        root.spawnParatrooper(sp.x, sp.y + 10);
+                    if (Math.random() < 0.012 && sp.x > 160 && sp.x < win.width - 60) {
+                        root.spawnParatrooper(sp.x, sp.y + 12);
                     }
 
-                    // Hit check with player
                     var distP = Math.hypot(sp.x - root.playerX, sp.y - root.playerY);
-                    if (distP < 38) {
-                        root.spawnExplosion(sp.x, sp.y, false);
+                    if (distP < 42) {
+                        root.spawnDramaticExplosion(sp.x, sp.y, 1.0, false);
                         backend.recordPlaneDestroyed();
-                        root.addFloatingText("BOOM!", sp.x, sp.y, "#ff9e64");
-                        root.invulnerableTicks = 45;
+                        root.addFloatingText("SPLASHED! +150", sp.x, sp.y, "#ff9e64");
+                        root.invulnerableTicks = 40;
                         continue;
                     }
 
@@ -302,33 +435,31 @@ ApplicationWindow {
                 }
                 root.smallPlanes = nextPlanes;
 
-                // 5. Paratroopers update (Float down to city, player can rescue them!)
+                // 6. Paratroopers update
                 var nextTroopers = [];
                 for (var pti = 0; pti < root.paratroopers.length; ++pti) {
                     var pt = root.paratroopers[pti];
                     pt.y += pt.vy;
                     pt.sway += 0.05;
-                    pt.x += Math.sin(pt.sway) * 0.6;
+                    pt.x += Math.sin(pt.sway) * 0.65;
 
-                    // Rescue check by player airplane
                     var distRes = Math.hypot(pt.x - root.playerX, pt.y - root.playerY);
-                    if (distRes < 45) {
+                    if (distRes < 48) {
                         backend.recordRescue();
-                        root.addFloatingText("SAVED! ⭐", pt.x, pt.y - 20, theme.accent);
-                        for (var starI = 0; starI < 8; ++starI) {
+                        root.addFloatingText("RESCUED! ⭐ +500", pt.x, pt.y - 20, "#9ece6a");
+                        for (var starI = 0; starI < 10; ++starI) {
                             var sang = Math.random() * 6.28;
                             root.particles.push({
                                 x: pt.x, y: pt.y,
-                                vx: Math.cos(sang) * 2, vy: Math.sin(sang) * 2,
-                                life: 1.0, decay: 0.04, color: "#ffd60a", size: 4
+                                vx: Math.cos(sang) * 2.5, vy: Math.sin(sang) * 2.5,
+                                life: 1.0, decay: 0.04, color: "#ffd60a", size: 4.5, smoke: false
                             });
                         }
                         continue;
                     }
 
-                    // Reached ground / cityscape safely
-                    if (pt.y > win.height - 70) {
-                        root.addFloatingText("TOUCHDOWN!", pt.x, win.height - 70, "#9ece6a");
+                    if (pt.y > root.seaLevel - 6) {
+                        root.spawnWaterSplash(pt.x, root.seaLevel, 0.6);
                         continue;
                     }
 
@@ -336,80 +467,176 @@ ApplicationWindow {
                 }
                 root.paratroopers = nextTroopers;
 
-                // 6. Missiles update & collision
+                // 7. Heavy Cruise Missiles update & collision
                 var nextMissiles = [];
                 for (var mi = 0; mi < root.missiles.length; ++mi) {
                     var m = root.missiles[mi];
+                    m.vx = Math.min(13.5, m.vx + m.ax);
                     m.x += m.vx;
                     m.y += m.vy;
                     m.life--;
 
-                    // Missile smoke particles
-                    if (Math.random() < 0.5) {
-                        root.particles.push({
-                            x: m.x - 10, y: m.y + (Math.random() - 0.5) * 3,
-                            vx: -1.0, vy: (Math.random() - 0.5) * 0.5,
-                            life: 0.7, decay: 0.04, color: "#e0af68", size: 3
-                        });
-                    }
+                    // Dense rocket exhaust trail
+                    root.particles.push({
+                        x: m.x - 18,
+                        y: m.y + (Math.random() - 0.5) * 3,
+                        vx: -1.6,
+                        vy: (Math.random() - 0.5) * 0.6,
+                        life: 0.85,
+                        decay: 0.035,
+                        color: (Math.random() > 0.35) ? "#8892a8" : "#ff9e64",
+                        size: 5 + Math.random() * 3,
+                        smoke: true
+                    });
 
                     var missileHit = false;
 
-                    // Check hit with small planes
+                    // Hit check against small planes
                     for (var pi = 0; pi < root.smallPlanes.length; ++pi) {
                         var spl = root.smallPlanes[pi];
-                        if (Math.hypot(m.x - spl.x, m.y - spl.y) < 24) {
-                            root.spawnExplosion(spl.x, spl.y, false);
+                        if (Math.hypot(m.x - spl.x, m.y - spl.y) < 30) {
+                            root.spawnDramaticExplosion(spl.x, spl.y, 1.25, false);
                             backend.recordPlaneDestroyed();
-                            root.addFloatingText("+100", spl.x, spl.y - 10, "#9ece6a");
+                            root.addFloatingText("DIRECT HIT! +150", spl.x, spl.y - 14, "#ffd60a");
                             root.smallPlanes.splice(pi, 1);
                             missileHit = true;
                             break;
                         }
                     }
 
-                    // Check hit with mothership
+                    // Hit check against giant mothership
                     if (!missileHit && root.bossActive) {
-                        if (m.x > root.bossX - 80 && m.x < root.bossX + 80 &&
-                            m.y > root.bossY - 35 && m.y < root.bossY + 35) {
-                            root.bossHealth -= 4;
-                            root.spawnExplosion(m.x, m.y, false);
+                        if (m.x > root.bossX - 90 && m.x < root.bossX + 90 &&
+                            m.y > root.bossY - 38 && m.y < root.bossY + 38) {
+                            root.bossHealth -= 14;
+                            root.spawnDramaticExplosion(m.x, m.y, 1.35, false);
                             missileHit = true;
 
                             if (root.bossHealth <= 0) {
                                 root.bossActive = false;
-                                root.spawnExplosion(root.bossX, root.bossY, true);
-                                root.spawnExplosion(root.bossX - 40, root.bossY + 10, true);
-                                root.spawnExplosion(root.bossX + 40, root.bossY - 10, true);
+                                root.spawnDramaticExplosion(root.bossX, root.bossY, 2.4, false);
+                                root.spawnDramaticExplosion(root.bossX - 55, root.bossY + 12, 1.8, false);
+                                root.spawnDramaticExplosion(root.bossX + 55, root.bossY - 12, 1.8, false);
                                 backend.recordMothershipDefeated();
-                                root.addFloatingText("MEGA BOOM! 💥", root.bossX, root.bossY, "#ff7a93");
+                                root.addFloatingText("MOTHERSHIP OBLITERATED! 💥", root.bossX - 40, root.bossY, "#ff4d4d");
                             }
                         }
                     }
 
-                    if (!missileHit && m.x < win.width + 50 && m.life > 0)
+                    if (!missileHit && m.x < win.width + 80 && m.life > 0)
                         nextMissiles.push(m);
                 }
                 root.missiles = nextMissiles;
 
-                // 7. Particles update
+                // 8. Gravity Bombs update & collision with Planes and Enemy Warships below!
+                var nextBombs = [];
+                for (var bi = 0; bi < root.bombs.length; ++bi) {
+                    var bmb = root.bombs[bi];
+                    bmb.vy += bmb.gravity;
+                    bmb.x += bmb.vx;
+                    bmb.y += bmb.vy;
+                    bmb.angle = Math.atan2(bmb.vy, bmb.vx);
+                    bmb.life--;
+
+                    var bombHit = false;
+
+                    // Bombs can hit enemy planes flying below the B-2 Spirit!
+                    for (var bpi = 0; bpi < root.smallPlanes.length; ++bpi) {
+                        var bpl = root.smallPlanes[bpi];
+                        if (Math.hypot(bmb.x - bpl.x, bmb.y - bpl.y) < 30) {
+                            root.spawnDramaticExplosion(bpl.x, bpl.y, 1.35, false);
+                            backend.recordPlaneDestroyed();
+                            root.addFloatingText("AIR BOMB HIT! +150", bpl.x, bpl.y - 12, "#ff9e64");
+                            root.smallPlanes.splice(bpi, 1);
+                            bombHit = true;
+                            break;
+                        }
+                    }
+
+                    // Bombs hit enemy warships on the sea!
+                    if (!bombHit) {
+                        for (var si = 0; si < root.warships.length; ++si) {
+                            var ship = root.warships[si];
+                            if (ship.sinking) continue;
+                            if (bmb.x > ship.x - ship.w * 0.5 && bmb.x < ship.x + ship.w * 0.5 &&
+                                bmb.y >= root.seaLevel - ship.h && bmb.y <= root.seaLevel + 15) {
+                                ship.hp -= 2;
+                                bombHit = true;
+                                if (ship.hp <= 0) {
+                                    ship.sinking = true;
+                                    root.spawnDramaticExplosion(ship.x, root.seaLevel - ship.h * 0.4, 2.2, true);
+                                    root.spawnDramaticExplosion(ship.x - 30, root.seaLevel - 10, 1.5, true);
+                                    backend.recordShipDestroyed();
+                                    root.addFloatingText("WARSHIP SUNK! 💥 +800", ship.x - 30, root.seaLevel - 50, "#ff4d4d");
+                                } else {
+                                    root.spawnDramaticExplosion(bmb.x, bmb.y, 1.3, true);
+                                    backend.addScore(200);
+                                    root.addFloatingText("DECK HIT! +200", bmb.x, bmb.y - 20, "#ffd60a");
+                                }
+                                break;
+                            }
+                        }
+                    }
+
+                    // Bomb hits the sea water directly
+                    if (!bombHit && bmb.y >= root.seaLevel) {
+                        root.spawnWaterSplash(bmb.x, root.seaLevel, 1.3);
+                        root.shockwaves.push({
+                            x: bmb.x, y: root.seaLevel,
+                            radius: 4, maxRadius: 38, alpha: 0.7, width: 2.5, color: "#7dcfff"
+                        });
+                        bombHit = true;
+                    }
+
+                    if (!bombHit && bmb.life > 0)
+                        nextBombs.push(bmb);
+                }
+                root.bombs = nextBombs;
+
+                // 9. Shockwaves update
+                var nextWaves = [];
+                for (var swi = 0; swi < root.shockwaves.length; ++swi) {
+                    var sw = root.shockwaves[swi];
+                    sw.radius += (sw.maxRadius - sw.radius) * 0.16 + 1.5;
+                    sw.alpha -= 0.045;
+                    if (sw.alpha > 0.02)
+                        nextWaves.push(sw);
+                }
+                root.shockwaves = nextWaves;
+
+                // 10. Water splashes update
+                var nextSplashes = [];
+                for (var spli = 0; spli < root.splashes.length; ++spli) {
+                    var spDrop = root.splashes[spli];
+                    spDrop.x += spDrop.vx;
+                    spDrop.y += spDrop.vy;
+                    spDrop.vy += 0.28;
+                    spDrop.life -= 0.03;
+                    if (spDrop.life > 0 && spDrop.y <= root.seaLevel + 12)
+                        nextSplashes.push(spDrop);
+                }
+                root.splashes = nextSplashes;
+
+                // 11. Particles update
                 var nextParticles = [];
                 for (var pri = 0; pri < root.particles.length; ++pri) {
                     var p = root.particles[pri];
                     p.x += p.vx;
                     p.y += p.vy;
+                    if (p.smoke)
+                        p.size += 0.18;
                     p.life -= p.decay;
                     if (p.life > 0)
                         nextParticles.push(p);
                 }
                 root.particles = nextParticles;
 
-                // 8. Floating texts update
+                // 12. Floating texts update
                 var nextTexts = [];
                 for (var ti = 0; ti < root.floatingTexts.length; ++ti) {
                     var ft = root.floatingTexts[ti];
                     ft.y += ft.vy;
-                    ft.alpha -= 0.02;
+                    ft.alpha -= 0.018;
                     if (ft.alpha > 0)
                         nextTexts.push(ft);
                 }
@@ -419,7 +646,7 @@ ApplicationWindow {
             }
         }
 
-        // --- DRAWING CANVAS ---
+        // --- WARTIME SEASCAPE & COMBAT RENDERING CANVAS ---
         Canvas {
             id: gameCanvas
             anchors.fill: parent
@@ -428,302 +655,561 @@ ApplicationWindow {
                 var ctx = getContext("2d");
                 ctx.clearRect(0, 0, width, height);
 
-                // 1. SKY GRADIENT
-                var skyGrad = ctx.createLinearGradient(0, 0, 0, height);
-                skyGrad.addColorStop(0.0, "#0b0d1b");
-                skyGrad.addColorStop(0.45, "#151930");
-                skyGrad.addColorStop(0.75, "#1e223d");
-                skyGrad.addColorStop(1.0, "#2c2642");
-                ctx.fillStyle = skyGrad;
-                ctx.fillRect(0, 0, width, height);
-
-                // Stars
-                ctx.fillStyle = "#ffffff";
-                for (var si = 0; si < 40; ++si) {
-                    var sx = ((si * 137.5) % width);
-                    var sy = ((si * 93.1) % (height * 0.55));
-                    ctx.fillRect(sx, sy, 1.5, 1.5);
+                ctx.save();
+                // Screen shake offset on dramatic impacts
+                if (root.shakeIntensity > 0.5) {
+                    var sx = (Math.random() - 0.5) * root.shakeIntensity;
+                    var sy = (Math.random() - 0.5) * root.shakeIntensity;
+                    ctx.translate(sx, sy);
                 }
 
-                // 2. CLOUDS
-                ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+                // 1. WARTIME STORMY SKY GRADIENT
+                var skyGrad = ctx.createLinearGradient(0, 0, 0, root.seaLevel);
+                skyGrad.addColorStop(0.0, "#080b12");
+                skyGrad.addColorStop(0.45, "#121a2a");
+                skyGrad.addColorStop(0.80, "#1d2b44");
+                skyGrad.addColorStop(1.0, "#2b3a55");
+                ctx.fillStyle = skyGrad;
+                ctx.fillRect(0, 0, width, root.seaLevel);
+
+                // Distant wartime horizon glow (artillery / burning fleet glow on horizon)
+                var horizonGlow = ctx.createRadialGradient(width * 0.65, root.seaLevel, 10, width * 0.65, root.seaLevel, 380);
+                horizonGlow.addColorStop(0.0, "rgba(255, 110, 50, 0.22)");
+                horizonGlow.addColorStop(0.5, "rgba(247, 118, 142, 0.08)");
+                horizonGlow.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+                ctx.fillStyle = horizonGlow;
+                ctx.fillRect(0, root.seaLevel - 320, width, 320);
+
+                // Searchlight beams sweeping from distant naval horizon
+                ctx.save();
+                ctx.fillStyle = "rgba(180, 210, 255, 0.04)";
+                for (var sbi = 0; sbi < 2; ++sbi) {
+                    var bx = width * (0.3 + sbi * 0.45);
+                    var swing = Math.sin(root.seaTime * 0.5 + sbi * 2.1) * 180;
+                    ctx.beginPath();
+                    ctx.moveTo(bx, root.seaLevel);
+                    ctx.lineTo(bx + swing - 70, 0);
+                    ctx.lineTo(bx + swing + 70, 0);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                ctx.restore();
+
+                // 2. STORM CLOUDS
                 for (var ci = 0; ci < root.clouds.length; ++ci) {
                     var c = root.clouds[ci];
+                    ctx.fillStyle = c.dark ? "rgba(18, 24, 38, 0.55)" : "rgba(180, 195, 220, 0.08)";
                     ctx.beginPath();
-                    ctx.arc(c.x, c.y, 35 * c.s, 0, 6.28);
-                    ctx.arc(c.x + 30 * c.s, c.y - 10 * c.s, 40 * c.s, 0, 6.28);
-                    ctx.arc(c.x + 70 * c.s, c.y, 30 * c.s, 0, 6.28);
+                    ctx.arc(c.x, c.y, 38 * c.s, 0, 6.28);
+                    ctx.arc(c.x + 34 * c.s, c.y - 12 * c.s, 45 * c.s, 0, 6.28);
+                    ctx.arc(c.x + 76 * c.s, c.y, 34 * c.s, 0, 6.28);
                     ctx.fill();
                 }
 
-                // 3. FAR CITYSCAPE
-                for (var fi = 0; fi < root.cityscapeFar.length; ++fi) {
-                    var fb = root.cityscapeFar[fi];
-                    ctx.fillStyle = fb.color;
-                    ctx.fillRect(fb.x, height - fb.h, fb.w, fb.h);
+                // 3. BACKGROUND OCEAN SWELLS (Behind Ships)
+                var seaGrad = ctx.createLinearGradient(0, root.seaLevel - 15, 0, height);
+                seaGrad.addColorStop(0.0, "#13314c");
+                seaGrad.addColorStop(0.4, "#0d253a");
+                seaGrad.addColorStop(1.0, "#071521");
+                ctx.fillStyle = seaGrad;
+                ctx.fillRect(0, root.seaLevel - 8, width, height - root.seaLevel + 16);
+
+                // Rolling back wave layer
+                ctx.fillStyle = "#173c5e";
+                ctx.beginPath();
+                ctx.moveTo(0, height);
+                for (var wx = 0; wx <= width + 40; wx += 40) {
+                    var wy = root.seaLevel - 6 + Math.sin(wx * 0.015 + root.seaTime) * 5;
+                    ctx.lineTo(wx, wy);
                 }
+                ctx.lineTo(width, height);
+                ctx.closePath();
+                ctx.fill();
 
-                // 4. NEAR CITYSCAPE WITH GLOWING WINDOWS
-                for (var ni = 0; ni < root.cityscapeNear.length; ++ni) {
-                    var nb = root.cityscapeNear[ni];
-                    ctx.fillStyle = nb.color;
-                    ctx.fillRect(nb.x, height - nb.h, nb.w, nb.h);
+                // 4. ENEMY WARSHIPS STEAMING ON THE SEA
+                for (var wsi = 0; wsi < root.warships.length; ++wsi) {
+                    var sh = root.warships[wsi];
+                    ctx.save();
+                    var bobY = Math.sin(root.seaTime * 1.4 + wsi) * 2.5;
+                    ctx.translate(sh.x, root.seaLevel + bobY + sh.sinkDepth);
+                    ctx.rotate(sh.sinkAngle + Math.sin(root.seaTime + wsi) * 0.015);
 
-                    // Antenna on roof
-                    if (nb.antenna) {
-                        ctx.strokeStyle = "#565f89";
+                    var hw = sh.w * 0.5;
+                    // Armored Naval Hull
+                    ctx.fillStyle = "#3b4354";
+                    ctx.beginPath();
+                    ctx.moveTo(-hw, -sh.h * 0.45);        // Sharp naval bow (pointing left)
+                    ctx.lineTo(hw, -sh.h * 0.42);         // Stern deck
+                    ctx.lineTo(hw - 10, 6);               // Stern waterline
+                    ctx.lineTo(-hw + 14, 6);              // Bow waterline
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Hull stripe / armor belt
+                    ctx.fillStyle = "#282e3a";
+                    ctx.fillRect(-hw + 14, -6, sh.w - 24, 5);
+
+                    if (sh.type === "carrier") {
+                        // Flight deck overhang
+                        ctx.fillStyle = "#2b303c";
+                        ctx.fillRect(-hw - 4, -sh.h * 0.55, sh.w + 8, 7);
+                        // White runway markings
+                        ctx.fillStyle = "#d8dee9";
+                        for (var rmk = -hw + 10; rmk < hw - 15; rmk += 22) {
+                            ctx.fillRect(rmk, -sh.h * 0.52, 12, 2);
+                        }
+                        // Carrier Island Superstructure
+                        ctx.fillStyle = "#4c566a";
+                        ctx.fillRect(10, -sh.h, 34, sh.h * 0.5);
+                        // Radar mast
+                        ctx.strokeStyle = "#8892a8";
                         ctx.lineWidth = 2;
                         ctx.beginPath();
-                        ctx.moveTo(nb.x + nb.w * 0.5, height - nb.h);
-                        ctx.lineTo(nb.x + nb.w * 0.5, height - nb.h - 18);
+                        ctx.moveTo(27, -sh.h);
+                        ctx.lineTo(27, -sh.h - 14);
+                        ctx.stroke();
+                    } else {
+                        // Bridge Superstructure (Destroyer / Cruiser)
+                        ctx.fillStyle = "#4c566a";
+                        ctx.fillRect(-16, -sh.h * 0.85, 38, sh.h * 0.42);
+                        ctx.fillStyle = "#2e3440";
+                        ctx.fillRect(-12, -sh.h * 0.78, 14, 5); // Bridge windows
+
+                        // Radar & Mast tower
+                        ctx.fillStyle = "#5e6a82";
+                        ctx.fillRect(4, -sh.h - 6, 8, sh.h * 0.3);
+
+                        // Forward Naval Gun Turret + Twin Barrels
+                        ctx.fillStyle = "#2e3440";
+                        ctx.beginPath();
+                        ctx.arc(-hw + 32, -sh.h * 0.45, 8, 3.14, 0);
+                        ctx.fill();
+                        ctx.strokeStyle = "#8892a8";
+                        ctx.lineWidth = 2.5;
+                        ctx.beginPath();
+                        ctx.moveTo(-hw + 26, -sh.h * 0.52);
+                        ctx.lineTo(-hw + 8, -sh.h * 0.68);
                         ctx.stroke();
 
-                        // Blinking red beacon
-                        ctx.fillStyle = (Math.floor(Date.now() / 400) % 2 === 0) ? "#f7768e" : "#565f89";
+                        // Rear turret for cruiser
+                        if (sh.type === "cruiser") {
+                            ctx.beginPath();
+                            ctx.arc(hw - 28, -sh.h * 0.45, 7, 3.14, 0);
+                            ctx.fill();
+                        }
+                    }
+
+                    // Bow wake white foam
+                    if (!sh.sinking) {
+                        ctx.fillStyle = "rgba(235, 245, 255, 0.75)";
                         ctx.beginPath();
-                        ctx.arc(nb.x + nb.w * 0.5, height - nb.h - 18, 3, 0, 6.28);
+                        ctx.ellipse(-hw + 6, 4, 14, 3.5, 0, 0, 6.28);
                         ctx.fill();
+
+                        // Ship health bar when damaged
+                        if (sh.hp < sh.maxHp) {
+                            ctx.fillStyle = "rgba(0,0,0,0.65)";
+                            ctx.fillRect(-28, -sh.h - 18, 56, 5);
+                            ctx.fillStyle = "#ff4d4d";
+                            ctx.fillRect(-28, -sh.h - 18, 56 * (sh.hp / sh.maxHp), 5);
+                        }
                     }
-
-                    // Windows
-                    for (var wi = 0; wi < nb.windows.length; ++wi) {
-                        var winObj = nb.windows[wi];
-                        ctx.fillStyle = winObj.on ? "#ffd60a" : "rgba(255,255,255,0.06)";
-                        ctx.fillRect(nb.x + winObj.rx, height - nb.h + winObj.ry, 6, 9);
-                    }
-                }
-
-                // 5. GIANT MOTHERSHIP AIRPLANE
-                if (root.bossActive) {
-                    ctx.save();
-                    ctx.translate(root.bossX, root.bossY);
-
-                    // Main fuselage (Facing Left)
-                    ctx.fillStyle = "#343b58";
-                    ctx.beginPath();
-                    ctx.ellipse(0, 0, 95, 30, 0, 0, 6.28);
-                    ctx.fill();
-
-                    // Wings
-                    ctx.fillStyle = "#24283b";
-                    ctx.beginPath();
-                    ctx.moveTo(20, -5);
-                    ctx.lineTo(40, -55);
-                    ctx.lineTo(-20, -55);
-                    ctx.lineTo(-10, -5);
-                    ctx.closePath();
-                    ctx.fill();
-
-                    // Lower wing
-                    ctx.beginPath();
-                    ctx.moveTo(20, 5);
-                    ctx.lineTo(40, 48);
-                    ctx.lineTo(-20, 48);
-                    ctx.lineTo(-10, 5);
-                    ctx.closePath();
-                    ctx.fill();
-
-                    // Engines with jet glow
-                    ctx.fillStyle = "#1a1b26";
-                    ctx.fillRect(10, -45, 30, 10);
-                    ctx.fillRect(10, 38, 30, 10);
-                    ctx.fillStyle = "#ff9e64";
-                    ctx.fillRect(40, -43, 8 + Math.random() * 6, 6);
-                    ctx.fillRect(40, 40, 8 + Math.random() * 6, 6);
-
-                    // Cockpit windshield (Left side)
-                    ctx.fillStyle = "#7dcfff";
-                    ctx.beginPath();
-                    ctx.ellipse(-65, -6, 16, 8, -0.2, 0, 6.28);
-                    ctx.fill();
-
-                    // Hangar Bay door at rear (Flashing yellow when releasing small planes!)
-                    ctx.fillStyle = root.bossHangarOpen ? "#ff9e64" : "#1a1b26";
-                    ctx.fillRect(50, -8, 22, 16);
-
-                    // Boss Health Bar
-                    ctx.fillStyle = "rgba(0,0,0,0.6)";
-                    ctx.fillRect(-60, -65, 120, 8);
-                    ctx.fillStyle = theme.accent;
-                    var hpFrac = Math.max(0, root.bossHealth / root.bossMaxHealth);
-                    ctx.fillRect(-60, -65, 120 * hpFrac, 8);
 
                     ctx.restore();
                 }
 
-                // 6. SMALL ENEMY PLANES
+                // 5. FOREGROUND ROLLING SEA WAVES & FOAM CRESTS (Covers ship waterlines)
+                ctx.fillStyle = "rgba(18, 55, 88, 0.82)";
+                ctx.beginPath();
+                ctx.moveTo(0, height);
+                for (var fwx = 0; fwx <= width + 30; fwx += 30) {
+                    var fwy = root.seaLevel + 2 + Math.sin(fwx * 0.022 + root.seaTime * 1.6) * 5.5;
+                    ctx.lineTo(fwx, fwy);
+                }
+                ctx.lineTo(width, height);
+                ctx.closePath();
+                ctx.fill();
+
+                // Whitecap wave crests
+                ctx.strokeStyle = "rgba(210, 235, 255, 0.28)";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                for (var cwx = 0; cwx <= width; cwx += 30) {
+                    var cwy = root.seaLevel + 2 + Math.sin(cwx * 0.022 + root.seaTime * 1.6) * 5.5;
+                    if (cwx === 0) ctx.moveTo(cwx, cwy);
+                    else ctx.lineTo(cwx, cwy);
+                }
+                ctx.stroke();
+
+                // 6. WATER SPLASH GEYSERS
+                ctx.fillStyle = "rgba(230, 245, 255, 0.85)";
+                for (var spli = 0; spli < root.splashes.length; ++spli) {
+                    var spD = root.splashes[spli];
+                    ctx.globalAlpha = Math.max(0, spD.life);
+                    ctx.beginPath();
+                    ctx.arc(spD.x, spD.y, spD.size, 0, 6.28);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1.0;
+
+                // 7. GIANT AIRBORNE CARRIER / MOTHERSHIP
+                if (root.bossActive) {
+                    ctx.save();
+                    ctx.translate(root.bossX, root.bossY);
+
+                    // Swept Heavy Wings
+                    ctx.fillStyle = "#252b3b";
+                    ctx.beginPath();
+                    ctx.moveTo(15, -6);
+                    ctx.lineTo(45, -58);
+                    ctx.lineTo(-22, -58);
+                    ctx.lineTo(-14, -6);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.moveTo(15, 6);
+                    ctx.lineTo(45, 52);
+                    ctx.lineTo(-22, 52);
+                    ctx.lineTo(-14, 6);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Heavy Fuselage
+                    ctx.fillStyle = "#363e52";
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, 98, 28, 0, 0, 6.28);
+                    ctx.fill();
+
+                    // 4 Heavy Turbine Nacelles + Afterburners
+                    ctx.fillStyle = "#1a1e29";
+                    ctx.fillRect(12, -46, 32, 10);
+                    ctx.fillRect(12, 38, 32, 10);
+                    ctx.fillStyle = "#ff9e64";
+                    ctx.fillRect(44, -44, 10 + Math.random() * 7, 6);
+                    ctx.fillRect(44, 40, 10 + Math.random() * 7, 6);
+
+                    // Armored Cockpit Glass
+                    ctx.fillStyle = "#7dcfff";
+                    ctx.beginPath();
+                    ctx.ellipse(-68, -5, 16, 7, -0.18, 0, 6.28);
+                    ctx.fill();
+
+                    // Illuminated Drop Hangar Bay
+                    ctx.fillStyle = root.bossHangarOpen ? "#ff9e64" : "#161922";
+                    ctx.fillRect(46, -9, 26, 18);
+
+                    // Boss Health Bar
+                    ctx.fillStyle = "rgba(0,0,0,0.65)";
+                    ctx.fillRect(-65, -70, 130, 8);
+                    ctx.fillStyle = "#ff4d4d";
+                    var hpFrac = Math.max(0, root.bossHealth / root.bossMaxHealth);
+                    ctx.fillRect(-65, -70, 130 * hpFrac, 8);
+
+                    ctx.restore();
+                }
+
+                // 8. SMALL ENEMY FIGHTER PLANES
                 for (var spi = 0; spi < root.smallPlanes.length; ++spi) {
                     var sp = root.smallPlanes[spi];
                     ctx.save();
                     ctx.translate(sp.x, sp.y);
 
-                    // Small Jet (Facing Left)
-                    ctx.fillStyle = "#f7768e";
+                    // Swept enemy fighter silhouette
+                    ctx.fillStyle = "#d24d57";
                     ctx.beginPath();
-                    ctx.moveTo(-18, 0);
-                    ctx.lineTo(12, -10);
-                    ctx.lineTo(8, 0);
-                    ctx.lineTo(12, 10);
+                    ctx.moveTo(-22, 0);
+                    ctx.lineTo(14, -12);
+                    ctx.lineTo(7, -2);
+                    ctx.lineTo(16, 0);
+                    ctx.lineTo(7, 2);
+                    ctx.lineTo(14, 12);
                     ctx.closePath();
                     ctx.fill();
 
-                    // Cockpit
-                    ctx.fillStyle = "#c0caf5";
+                    // Canopy
+                    ctx.fillStyle = "#a9b1d6";
                     ctx.beginPath();
-                    ctx.arc(-4, -1, 3, 0, 6.28);
+                    ctx.ellipse(-6, -1, 5, 2.5, 0, 0, 6.28);
                     ctx.fill();
 
-                    // Jet flame
+                    // Afterburner
                     ctx.fillStyle = "#ff9e64";
-                    ctx.fillRect(10, -2, 5 + Math.random() * 4, 4);
+                    ctx.fillRect(14, -2, 6 + Math.random() * 5, 4);
 
                     ctx.restore();
                 }
 
-                // 7. PARATROOPERS JUMPING OUT
+                // 9. PARATROOPERS JUMPING OUT
                 for (var pti = 0; pti < root.paratroopers.length; ++pti) {
                     var pt = root.paratroopers[pti];
                     ctx.save();
                     ctx.translate(pt.x, pt.y);
 
-                    // Parachute canopy
                     ctx.fillStyle = pt.color;
                     ctx.beginPath();
                     ctx.arc(0, -18, 16, 3.14, 0);
                     ctx.closePath();
                     ctx.fill();
 
-                    // Suspension lines
-                    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+                    ctx.strokeStyle = "rgba(255,255,255,0.55)";
                     ctx.lineWidth = 1;
                     ctx.beginPath();
                     ctx.moveTo(-14, -18); ctx.lineTo(0, 0);
-                    ctx.moveTo(-7, -18);  ctx.lineTo(0, 0);
-                    ctx.moveTo(7, -18);   ctx.lineTo(0, 0);
+                    ctx.moveTo(-6, -18);  ctx.lineTo(0, 0);
+                    ctx.moveTo(6, -18);   ctx.lineTo(0, 0);
                     ctx.moveTo(14, -18);  ctx.lineTo(0, 0);
                     ctx.stroke();
 
-                    // Soldier figure
-                    ctx.fillStyle = "#c0caf5";
+                    ctx.fillStyle = "#d8dee9";
                     ctx.beginPath();
-                    ctx.arc(0, 3, 3.5, 0, 6.28); // Head
+                    ctx.arc(0, 3, 3.5, 0, 6.28);
                     ctx.fill();
-                    ctx.fillStyle = "#414868";
-                    ctx.fillRect(-2.5, 6, 5, 7); // Body
+                    ctx.fillStyle = "#4c566a";
+                    ctx.fillRect(-2.5, 6, 5, 7);
 
                     ctx.restore();
                 }
 
-                // 8. MISSILES
+                // 10. HEAVY GRAVITY BOMBS DROPPING ON PLANES & SHIPS
+                for (var bi = 0; bi < root.bombs.length; ++bi) {
+                    var bmb = root.bombs[bi];
+                    ctx.save();
+                    ctx.translate(bmb.x, bmb.y);
+                    ctx.rotate(bmb.angle);
+
+                    // Tail stabilizer fins
+                    ctx.fillStyle = "#2b303c";
+                    ctx.beginPath();
+                    ctx.moveTo(-13, -6);
+                    ctx.lineTo(-7, -3);
+                    ctx.lineTo(-7, 3);
+                    ctx.lineTo(-13, 6);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Heavy olive-steel bomb casing
+                    ctx.fillStyle = "#4b5340";
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, 11, 4.5, 0, 0, 6.28);
+                    ctx.fill();
+
+                    // High-explosive yellow warhead stripe
+                    ctx.fillStyle = "#ffd60a";
+                    ctx.fillRect(4, -3.8, 3, 7.6);
+
+                    ctx.restore();
+                }
+
+                // 11. BIG HEAVY CRUISE MISSILES
                 for (var mi = 0; mi < root.missiles.length; ++mi) {
                     var m = root.missiles[mi];
                     ctx.save();
                     ctx.translate(m.x, m.y);
 
-                    // Missile body
-                    ctx.fillStyle = "#ffffff";
-                    ctx.fillRect(-10, -2.5, 16, 5);
-                    // Nose cone
-                    ctx.fillStyle = "#f7768e";
+                    // Roaring multi-layer rocket flame plume
+                    var plumeLen = 18 + Math.random() * 14;
+                    ctx.fillStyle = "#ff4d4d";
                     ctx.beginPath();
-                    ctx.moveTo(6, -2.5);
-                    ctx.lineTo(13, 0);
-                    ctx.lineTo(6, 2.5);
+                    ctx.moveTo(-16, -5);
+                    ctx.lineTo(-16 - plumeLen, 0);
+                    ctx.lineTo(-16, 5);
                     ctx.closePath();
                     ctx.fill();
-                    // Thruster flame
-                    ctx.fillStyle = "#ff9e64";
-                    ctx.fillRect(-16, -1.5, 6, 3);
+
+                    ctx.fillStyle = "#ffd60a";
+                    ctx.beginPath();
+                    ctx.moveTo(-16, -2.8);
+                    ctx.lineTo(-16 - plumeLen * 0.65, 0);
+                    ctx.lineTo(-16, 2.8);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Swept mid-body cruise wings
+                    ctx.fillStyle = "#6c768a";
+                    ctx.beginPath();
+                    ctx.moveTo(2, -4);
+                    ctx.lineTo(-6, -13);
+                    ctx.lineTo(-10, -13);
+                    ctx.lineTo(-5, -4);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.moveTo(2, 4);
+                    ctx.lineTo(-6, 13);
+                    ctx.lineTo(-10, 13);
+                    ctx.lineTo(-5, 4);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Tail fins
+                    ctx.fillStyle = "#4c566a";
+                    ctx.beginPath();
+                    ctx.moveTo(-10, -4);
+                    ctx.lineTo(-16, -9);
+                    ctx.lineTo(-16, 9);
+                    ctx.lineTo(-10, 4);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Heavy cylindrical missile body
+                    ctx.fillStyle = "#e5e9f0";
+                    ctx.fillRect(-16, -4, 28, 8);
+
+                    // Warhead hazard band
+                    ctx.fillStyle = "#ffd60a";
+                    ctx.fillRect(6, -4, 4, 8);
+
+                    // Armored nose cone
+                    ctx.fillStyle = "#d24d57";
+                    ctx.beginPath();
+                    ctx.moveTo(12, -4);
+                    ctx.lineTo(24, 0);
+                    ctx.lineTo(12, 4);
+                    ctx.closePath();
+                    ctx.fill();
 
                     ctx.restore();
                 }
 
-                // 9. HERO PLAYER AEROPLANE
+                // 12. REALISTIC B-2 SPIRIT STEALTH BOMBER (HERO PLANE)
                 ctx.save();
                 ctx.translate(root.playerX, root.playerY);
                 ctx.rotate(root.playerTilt);
 
-                // Thruster Flames
-                var flm = 8 + Math.random() * 8;
-                ctx.fillStyle = "#ff9e64";
+                // Concealed Dorsal Stealth Exhaust Glow (Twin recessed vents on top deck)
+                var jetGlow = 8 + Math.random() * 6;
+                ctx.fillStyle = "rgba(125, 207, 255, 0.75)";
                 ctx.beginPath();
-                ctx.moveTo(-28, -5); ctx.lineTo(-28 - flm, 0); ctx.lineTo(-28, 5);
+                ctx.moveTo(-22, -11); ctx.lineTo(-22 - jetGlow, -9); ctx.lineTo(-22, -6);
+                ctx.moveTo(-22, 6);   ctx.lineTo(-22 - jetGlow, 9);  ctx.lineTo(-22, 11);
+                ctx.fill();
+
+                // Open Internal Bomb Bay Glow when releasing missiles/bombs
+                if (root.bombBayOpenTicks > 0) {
+                    ctx.fillStyle = "rgba(255, 158, 100, 0.45)";
+                    ctx.beginPath();
+                    ctx.ellipse(0, 6, 18, 8, 0, 0, 6.28);
+                    ctx.fill();
+                }
+
+                // B-2 Spirit Iconic Flying-Wing Silhouette with Sawtooth "W" Trailing Edge
+                var b2Grad = ctx.createLinearGradient(-35, -45, 45, 45);
+                b2Grad.addColorStop(0.0, "#353c4a");
+                b2Grad.addColorStop(0.5, "#1f242d");
+                b2Grad.addColorStop(1.0, "#14171d");
+                ctx.fillStyle = b2Grad;
+                ctx.strokeStyle = "#525c70";
+                ctx.lineWidth = 1.4;
+
+                ctx.beginPath();
+                ctx.moveTo(44, 0);      // Sharp stealth nose beak
+                ctx.lineTo(-12, -54);   // Upper swept leading edge
+                ctx.lineTo(-26, -46);   // Upper clipped wingtip
+                ctx.lineTo(-14, -24);   // Upper outer sawtooth notch
+                ctx.lineTo(-28, -12);   // Upper inner sawtooth peak
+                ctx.lineTo(-18, 0);     // Center tail beaver-tail point
+                ctx.lineTo(-28, 12);    // Lower inner sawtooth peak
+                ctx.lineTo(-14, 24);    // Lower outer sawtooth notch
+                ctx.lineTo(-26, 46);    // Lower clipped wingtip
+                ctx.lineTo(-12, 54);    // Lower swept leading edge
                 ctx.closePath();
                 ctx.fill();
-                ctx.fillStyle = "#ffd60a";
+                ctx.stroke();
+
+                // Center Fuselage Blended Spine Highlight
+                ctx.fillStyle = "#2b313d";
                 ctx.beginPath();
-                ctx.moveTo(-28, -2.5); ctx.lineTo(-28 - flm * 0.6, 0); ctx.lineTo(-28, 2.5);
+                ctx.moveTo(40, 0);
+                ctx.lineTo(2, -16);
+                ctx.lineTo(-22, -10);
+                ctx.lineTo(-16, 0);
+                ctx.lineTo(-22, 10);
+                ctx.lineTo(2, 16);
                 ctx.closePath();
                 ctx.fill();
 
-                // Wings
-                ctx.fillStyle = "#414868";
+                // Radar-Absorbent Stealth Panel Seam Lines
+                ctx.strokeStyle = "rgba(140, 160, 190, 0.22)";
+                ctx.lineWidth = 1;
                 ctx.beginPath();
-                ctx.moveTo(-10, -28);
-                ctx.lineTo(14, 0);
-                ctx.lineTo(-10, 28);
-                ctx.lineTo(-18, 22);
-                ctx.lineTo(-12, 0);
-                ctx.lineTo(-18, -22);
-                ctx.closePath();
+                ctx.moveTo(16, -14); ctx.lineTo(-14, -44);
+                ctx.moveTo(16, 14);  ctx.lineTo(-14, 44);
+                ctx.moveTo(-6, -12); ctx.lineTo(-6, 12);
+                ctx.stroke();
+
+                // Twin Recessed Stealth Engine Intakes (S-duct serrated intakes)
+                ctx.fillStyle = "#101318";
+                ctx.beginPath();
+                ctx.moveTo(4, -12); ctx.lineTo(-6, -15); ctx.lineTo(-8, -8); ctx.closePath();
+                ctx.moveTo(4, 12);  ctx.lineTo(-6, 15);  ctx.lineTo(-8, 8);  ctx.closePath();
                 ctx.fill();
 
-                // Fuselage
-                ctx.fillStyle = theme.accent;
+                // B-2 Spirit Flush Wrap-Around Metallic Cockpit Windscreens (4 angled panes)
+                ctx.fillStyle = "#89b4fa";
                 ctx.beginPath();
-                ctx.moveTo(34, 0);
-                ctx.lineTo(-26, -9);
-                ctx.lineTo(-24, 0);
-                ctx.lineTo(-26, 9);
-                ctx.closePath();
+                ctx.moveTo(31, -2); ctx.lineTo(21, -9); ctx.lineTo(18, -3); ctx.closePath();
+                ctx.moveTo(31, 2);  ctx.lineTo(21, 9);  ctx.lineTo(18, 3);  ctx.closePath();
                 ctx.fill();
 
-                // Cockpit Canopy Glass
-                ctx.fillStyle = "#7dcfff";
+                ctx.fillStyle = "rgba(255, 214, 10, 0.35)"; // Gold radar-reflective tint
                 ctx.beginPath();
-                ctx.ellipse(4, 0, 10, 4, 0, 0, 6.28);
+                ctx.moveTo(20, -10); ctx.lineTo(13, -13); ctx.lineTo(14, -6); ctx.closePath();
+                ctx.moveTo(20, 10);  ctx.lineTo(13, 13);  ctx.lineTo(14, 6);  ctx.closePath();
                 ctx.fill();
 
-                // Wing Missiles Ready
-                ctx.fillStyle = "#f7768e";
-                ctx.fillRect(-4, -18, 12, 3);
-                ctx.fillRect(-4, 15, 12, 3);
-
-                // Invulnerability / Shield bubble
+                // Shield bubble when brushing past enemy planes
                 if (root.invulnerableTicks > 0) {
                     ctx.strokeStyle = (root.invulnerableTicks % 4 < 2) ? "#7dcfff" : theme.accent;
                     ctx.lineWidth = 2.5;
                     ctx.beginPath();
-                    ctx.arc(0, 0, 42, 0, 6.28);
+                    ctx.arc(0, 0, 56, 0, 6.28);
                     ctx.stroke();
                 }
 
                 ctx.restore();
 
-                // 10. PARTICLES & EXPLOSIONS
+                // 13. SUPERSONIC SHOCKWAVE RINGS
+                for (var swi = 0; swi < root.shockwaves.length; ++swi) {
+                    var sw = root.shockwaves[swi];
+                    ctx.save();
+                    ctx.strokeStyle = sw.color;
+                    ctx.globalAlpha = Math.max(0, sw.alpha);
+                    ctx.lineWidth = sw.width;
+                    ctx.beginPath();
+                    ctx.arc(sw.x, sw.y, sw.radius, 0, 6.28);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                // 14. DRAMATIC EXPLOSION FIREBALLS & SMOKE CLOUDS
                 for (var pri = 0; pri < root.particles.length; ++pri) {
                     var p = root.particles[pri];
                     ctx.fillStyle = p.color;
                     ctx.globalAlpha = Math.max(0, p.life);
                     ctx.beginPath();
-                    ctx.arc(p.x, p.y, p.size * p.life, 0, 6.28);
+                    var rad = p.smoke ? p.size : (p.size * p.life);
+                    ctx.arc(p.x, p.y, Math.max(1, rad), 0, 6.28);
                     ctx.fill();
                 }
                 ctx.globalAlpha = 1.0;
 
-                // 11. FLOATING TEXTS ("SAVED!", "BOOM!")
+                // 15. FLOATING COMBAT POPUPS
                 ctx.font = "bold 18px sans-serif";
                 for (var ti = 0; ti < root.floatingTexts.length; ++ti) {
                     var ft = root.floatingTexts[ti];
                     ctx.fillStyle = ft.color;
                     ctx.globalAlpha = Math.max(0, ft.alpha);
-                    ctx.fillText(ft.text, ft.x - 25, ft.y);
+                    ctx.fillText(ft.text, ft.x - 35, ft.y);
                 }
                 ctx.globalAlpha = 1.0;
+
+                ctx.restore();
             }
         }
 
-        // --- MOUSE INPUT (PRIMARY FOR 6-YEAR-OLD) ---
+        // --- MOUSE INPUT (LEFT CLICK: MISSILE + BOMB, RIGHT CLICK: CARPET BOMB) ---
         MouseArea {
             anchors.fill: parent
             hoverEnabled: true
@@ -737,7 +1223,10 @@ ApplicationWindow {
             onPressed: function(mouse) {
                 root.targetX = mouse.x;
                 root.targetY = mouse.y;
-                root.firePlayerMissiles();
+                if (mouse.button === Qt.RightButton)
+                    root.dropCarpetBombs();
+                else
+                    root.fireAllOrdnance();
             }
         }
 
@@ -754,19 +1243,17 @@ ApplicationWindow {
 
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 20
-                anchors.rightMargin: 20
-                spacing: 20
+                anchors.leftMargin: 18
+                anchors.rightMargin: 18
+                spacing: 14
 
-                // Title
                 Label {
-                    text: qsTr("Sky Strike")
+                    text: "B-2 " + qsTr("Sky Strike")
                     font.bold: true
                     font.pixelSize: 20
                     color: theme.accent
                 }
 
-                // Wave Badge
                 Rectangle {
                     color: "#14ffffff"
                     radius: Math.min(4, theme.radius)
@@ -782,7 +1269,6 @@ ApplicationWindow {
                     }
                 }
 
-                // Score Badge
                 Rectangle {
                     color: "#14ffffff"
                     radius: Math.min(4, theme.radius)
@@ -798,7 +1284,21 @@ ApplicationWindow {
                     }
                 }
 
-                // Rescues Badge
+                Rectangle {
+                    color: "#14ffffff"
+                    radius: Math.min(4, theme.radius)
+                    implicitWidth: shipsLabel.implicitWidth + 16
+                    implicitHeight: 32
+                    Label {
+                        id: shipsLabel
+                        anchors.centerIn: parent
+                        text: "🚢 " + qsTr("Ships: %1").arg(backend.shipsDestroyed)
+                        font.bold: true
+                        font.pixelSize: 13
+                        color: "#ff9e64"
+                    }
+                }
+
                 Rectangle {
                     color: "#14ffffff"
                     radius: Math.min(4, theme.radius)
@@ -807,7 +1307,7 @@ ApplicationWindow {
                     Label {
                         id: rescueLabel
                         anchors.centerIn: parent
-                        text: qsTr("Rescued: %1").arg(backend.rescues)
+                        text: "🪂 " + qsTr("Rescued: %1").arg(backend.rescues)
                         font.bold: true
                         font.pixelSize: 13
                         color: "#9ece6a"
@@ -816,7 +1316,6 @@ ApplicationWindow {
 
                 Item { Layout.fillWidth: true }
 
-                // Status cheer text
                 Label {
                     text: backend.statusMessage
                     font.bold: true
@@ -825,16 +1324,20 @@ ApplicationWindow {
                     visible: text.length > 0
                 }
 
-                // Fire Missiles Button (big touch/mouse target)
                 Button {
-                    text: "🚀 " + qsTr("Click or Space: Launch Missiles")
+                    text: "🚀 " + qsTr("Fire Missile & Drop Bomb")
                     Material.background: theme.accent
                     Material.foreground: theme.accentForeground
                     font.bold: true
-                    onClicked: root.firePlayerMissiles()
+                    onClicked: root.fireAllOrdnance()
                 }
 
-                // Help Button
+                Button {
+                    text: "💣 " + qsTr("Carpet Bomb")
+                    font.bold: true
+                    onClicked: root.dropCarpetBombs()
+                }
+
                 ToolButton {
                     text: "?"
                     font.bold: true
@@ -880,7 +1383,7 @@ ApplicationWindow {
         Rectangle {
             id: helpOverlay
             anchors.centerIn: parent
-            width: Math.min(620, parent.width - 40)
+            width: Math.min(640, parent.width - 40)
             height: Math.min(480, parent.height - 40)
             color: "#16161e"
             border.color: theme.accent
@@ -902,7 +1405,7 @@ ApplicationWindow {
                 }
 
                 Label {
-                    text: qsTr("City Defense Aeroplane Action")
+                    text: qsTr("B-2 Spirit Air & Naval Combat")
                     font.pixelSize: 14
                     color: "#a9b1d6"
                     Layout.alignment: Qt.AlignHCenter
@@ -919,31 +1422,31 @@ ApplicationWindow {
                     Layout.fillWidth: true
 
                     Label {
-                        text: "🖱️ " + qsTr("Mouse: Fly Aeroplane") + " — " + qsTr("Move to fly anywhere!")
+                        text: "🖱️ " + qsTr("Mouse: Fly B-2 Spirit")
                         font.pixelSize: 14
                         color: "#c0caf5"
                     }
 
                     Label {
-                        text: "🚀 " + qsTr("Click or Space: Launch Missiles") + " — " + qsTr("Blast small planes and mothership!")
+                        text: "🚀 " + qsTr("Left Click / Space: Heavy Cruise Missile + Bomb")
                         font.pixelSize: 14
-                        color: "#c0caf5"
+                        color: "#ffd60a"
                     }
 
                     Label {
-                        text: "🪂 " + qsTr("Save the Paratroopers!") + " — " + qsTr("Fly close to jumping soldiers to rescue them!")
+                        text: "💣 " + qsTr("Right Click / B: Carpet Bomb Enemy Warships!")
+                        font.pixelSize: 14
+                        color: "#ff9e64"
+                    }
+
+                    Label {
+                        text: "🪂 " + qsTr("Save the Paratroopers!")
                         font.pixelSize: 14
                         color: "#9ece6a"
                     }
 
                     Label {
-                        text: "👾 " + qsTr("Big Mothership Detected!") + " — " + qsTr("Watch the hangar open and launch small planes!")
-                        font.pixelSize: 14
-                        color: "#f7768e"
-                    }
-
-                    Label {
-                        text: "⌨️ Shortcuts: [Space] Fire Missiles | [P] Pause | [?] Toggle Help | [Q] Quit"
+                        text: "⌨️ Shortcuts: [Space] Missile+Bomb | [B] Carpet Bomb | [P] Pause | [?] Help | [Q] Quit"
                         font.pixelSize: 12
                         color: "#565f89"
                     }

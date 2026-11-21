@@ -9,6 +9,7 @@ class Backend : public QObject {
     Q_PROPERTY(int highScore READ highScore NOTIFY highScoreChanged)
     Q_PROPERTY(int rescues READ rescues NOTIFY rescuesChanged)
     Q_PROPERTY(int planesDestroyed READ planesDestroyed NOTIFY planesDestroyedChanged)
+    Q_PROPERTY(int shipsDestroyed READ shipsDestroyed NOTIFY shipsDestroyedChanged)
     Q_PROPERTY(int mothershipsDefeated READ mothershipsDefeated NOTIFY mothershipsDefeatedChanged)
     Q_PROPERTY(int wave READ wave NOTIFY waveChanged)
     Q_PROPERTY(bool paused READ paused NOTIFY pausedChanged)
@@ -22,6 +23,7 @@ public:
     int highScore() const { return m_highScore; }
     int rescues() const { return m_rescues; }
     int planesDestroyed() const { return m_planesDestroyed; }
+    int shipsDestroyed() const { return m_shipsDestroyed; }
     int mothershipsDefeated() const { return m_mothershipsDefeated; }
     int wave() const { return m_wave; }
     bool paused() const { return m_paused; }
@@ -32,6 +34,7 @@ public:
     Q_INVOKABLE void addScore(int points);
     Q_INVOKABLE void recordRescue();
     Q_INVOKABLE void recordPlaneDestroyed();
+    Q_INVOKABLE void recordShipDestroyed();
     Q_INVOKABLE void recordMothershipDefeated();
     Q_INVOKABLE void nextWave();
     Q_INVOKABLE void togglePause();
@@ -46,6 +49,7 @@ signals:
     void highScoreChanged();
     void rescuesChanged();
     void planesDestroyedChanged();
+    void shipsDestroyedChanged();
     void mothershipsDefeatedChanged();
     void waveChanged();
     void pausedChanged();
@@ -58,6 +62,7 @@ private:
     int m_highScore = 0;
     int m_rescues = 0;
     int m_planesDestroyed = 0;
+    int m_shipsDestroyed = 0;
     int m_mothershipsDefeated = 0;
     int m_wave = 1;
     bool m_paused = false;

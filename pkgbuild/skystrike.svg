@@ -1,32 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#1e2238"/>
-      <stop offset="100%" stop-color="#0e101a"/>
+      <stop offset="0%" stop-color="#141824"/>
+      <stop offset="65%" stop-color="#1b263b"/>
+      <stop offset="100%" stop-color="#0d3b66"/>
     </linearGradient>
-    <linearGradient id="plane" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#7aa2f7"/>
-      <stop offset="100%" stop-color="#3d59a1"/>
+    <linearGradient id="b2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3a4252"/>
+      <stop offset="100%" stop-color="#1b1f27"/>
     </linearGradient>
-    <linearGradient id="fire" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#ff9e64"/>
-      <stop offset="100%" stop-color="#f7768e"/>
+    <linearGradient id="fire" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ff4d4d"/>
+      <stop offset="50%" stop-color="#ff9e64"/>
+      <stop offset="100%" stop-color="#ffd60a"/>
     </linearGradient>
   </defs>
-  <!-- App Icon Base -->
+  <!-- Wartime Sky & Sea Background -->
   <rect width="64" height="64" rx="14" fill="url(#bg)"/>
-  
-  <!-- Thrust Flame -->
-  <polygon points="32,54 28,42 36,42" fill="url(#fire)"/>
-  <polygon points="32,50 30,42 34,42" fill="#ffc777"/>
-
-  <!-- Wings -->
-  <polygon points="32,18 10,40 18,44 32,38 46,44 54,40" fill="url(#plane)"/>
-  <!-- Jet Body -->
-  <polygon points="32,10 27,38 32,44 37,38" fill="#c0caf5"/>
-  <!-- Cockpit Canopy -->
-  <ellipse cx="32" cy="26" rx="2.5" ry="6" fill="#7dcfff"/>
-  <!-- Wing Missiles -->
-  <rect x="14" y="32" width="2.5" height="10" rx="1" fill="#f7768e"/>
-  <rect x="47.5" y="32" width="2.5" height="10" rx="1" fill="#f7768e"/>
+  <!-- Sea waves at bottom -->
+  <path d="M0,50 Q16,46 32,50 T64,50 L64,64 L0,64 Z" fill="#124e78" opacity="0.7"/>
+  <!-- B-2 Spirit Flying Wing Silhouette (Sawtooth trailing edge) -->
+  <polygon points="52,28 22,6 14,14 22,22 16,28 22,34 14,42 22,50" fill="url(#b2)" stroke="#56637a" stroke-width="1"/>
+  <!-- B-2 Stealth Cockpit Windows -->
+  <polygon points="44,26 38,23 39,27" fill="#7dcfff" opacity="0.85"/>
+  <polygon points="44,30 38,33 39,29" fill="#7dcfff" opacity="0.85"/>
+  <!-- Heavy Cruise Missile Launching -->
+  <rect x="34" y="42" width="16" height="4" rx="1.5" fill="#e0e6f0"/>
+  <polygon points="50,42 56,44 50,46" fill="#f7768e"/>
+  <polygon points="34,42 26,40 28,44 26,48 34,46" fill="url(#fire)"/>
 </svg>

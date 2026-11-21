@@ -18,11 +18,12 @@ private slots:
         QCOMPARE(backend.fireTrigger(), before + 1);
     }
 
-    void scoreAndRescueIncrements() {
+    void scoreRescueAndNavalCombatIncrements() {
         QTemporaryDir dir;
         Backend backend(dir.path() + "/test_stats.json");
         QCOMPARE(backend.score(), 0);
         QCOMPARE(backend.rescues(), 0);
+        QCOMPARE(backend.shipsDestroyed(), 0);
 
         backend.recordRescue();
         QCOMPARE(backend.rescues(), 1);
@@ -30,7 +31,11 @@ private slots:
 
         backend.recordPlaneDestroyed();
         QCOMPARE(backend.planesDestroyed(), 1);
-        QCOMPARE(backend.score(), 600);
+        QCOMPARE(backend.score(), 650);
+
+        backend.recordShipDestroyed();
+        QCOMPARE(backend.shipsDestroyed(), 1);
+        QCOMPARE(backend.score(), 1450);
     }
 
     void bossDefeatAdvancesWave() {

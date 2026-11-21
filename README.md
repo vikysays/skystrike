@@ -1,26 +1,24 @@
 # Sky Strike
 
-City defense aeroplane combat game for Omarchy, designed especially for quick arcade fun with the mouse.
+B-2 Spirit stealth bomber air and naval combat game for Omarchy, designed for effortless mouse control and explosive arcade action.
 
 ![Sky Strike screenshot](screenshot.png)
 
 ## Features
 
-- **Mouse-First Flight**: Aeroplane glides smoothly wherever the mouse moves.
-- **Missiles in the Plane**: Launch dual high-speed missiles with left click or Space bar.
-- **Giant Mothership**: Massive aircraft cruises across the sky with opening hangar bay doors.
-- **Small Fighter Planes**: Waves of agile mini jets launched from the mothership.
-- **Paratroopers Rescue**: Soldiers jump from planes with colorful parachutes; fly close to rescue them for bonus star points.
-- **Cityscape Ground**: Multi-layer parallax skyline with glowing windows and blinking antenna beacons.
-- **Live Omarchy Theme**: Live accent colors and Hyprland window rounding.
+- **B-2 Spirit Stealth Bomber**: Fly the iconic flying-wing stealth bomber with sawtooth trailing edge, flush cockpit windows, and internal bomb bay doors.
+- **Big Cruise Missiles & Dramatic Impact**: Launch heavy cruise missiles with roaring afterburner plumes, supersonic shockwave rings, multi-stage fireballs, dark smoke clouds, and screen shake.
+- **Bombing Runs on Planes & Warships**: Drop gravity bombs and carpet-bomb salvos from the B-2 Spirit's bomb bay onto lower enemy fighter planes and enemy warships steaming below.
+- **Wartime Seascape**: Dynamic rolling ocean swells, whitecap waves, searchlight beams, water splash geysers, and enemy destroyers, cruisers, and aircraft carriers that catch fire and sink when bombed.
+- **Giant Mothership & Paratroopers**: Enemy mothership launches small fighter jets while paratroopers parachute down for mid-air rescue.
 
 ## Keyboard and Mouse Controls
 
 | Input | Action |
 | --- | --- |
-| **Mouse Move** | Fly the aeroplane smoothly across the sky |
-| **Mouse Left Click** | Launch missiles |
-| **Space** | Launch missiles |
+| **Mouse Move** | Fly the B-2 Spirit stealth bomber across the sky |
+| **Mouse Left Click** / **Space** | Fire heavy cruise missile forward + drop gravity bomb downward |
+| **Mouse Right Click** / **B** | Unleash a 4-bomb carpet bombing salvo |
 | **P** | Pause / Resume |
 | **?** | Toggle help and shortcuts overlay |
 | **Q** | Quit |

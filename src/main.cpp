@@ -1,4 +1,4 @@
-// skystrike — City defense aeroplane combat game for Omarchy.
+// skystrike — B-2 Spirit stealth bomber air & naval combat game for Omarchy.
 
 #include <QDir>
 #include <QFile>
@@ -6,6 +6,7 @@
 #include <QIcon>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLoggingCategory>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
@@ -36,10 +37,10 @@ int runCli(int argc, char *argv[]) {
         file.write(
             "---\n"
             "name: skystrike\n"
-            "description: City defense aeroplane combat game for Omarchy.\n"
+            "description: B-2 Spirit stealth bomber air and wartime naval combat game for Omarchy.\n"
             "---\n\n"
             "# Sky Strike CLI\n\n"
-            "- `skystrike status --json`: Inspect game high score, statistics, and wave progress.\n"
+            "- `skystrike status --json`: Inspect game high score, ships sunk, planes destroyed, and wave progress.\n"
             "- `skystrike open`: Launch the game window.\n");
         file.close();
         if (jsonOut) {
@@ -60,6 +61,7 @@ int runCli(int argc, char *argv[]) {
             {QStringLiteral("highScore"), backend.highScore()},
             {QStringLiteral("rescues"), backend.rescues()},
             {QStringLiteral("planesDestroyed"), backend.planesDestroyed()},
+            {QStringLiteral("shipsDestroyed"), backend.shipsDestroyed()},
             {QStringLiteral("mothershipsDefeated"), backend.mothershipsDefeated()},
             {QStringLiteral("wave"), backend.wave()}
         };
@@ -69,6 +71,8 @@ int runCli(int argc, char *argv[]) {
             QTextStream(stdout) << "Sky Strike Stats:\n"
                                 << "  High Score: " << backend.highScore() << "\n"
                                 << "  Current Wave: " << backend.wave() << "\n"
+                                << "  Ships Sunk: " << backend.shipsDestroyed() << "\n"
+                                << "  Planes Destroyed: " << backend.planesDestroyed() << "\n"
                                 << "  Rescues: " << backend.rescues() << "\n";
         }
         return 0;
@@ -81,20 +85,26 @@ int runCli(int argc, char *argv[]) {
 } // namespace
 
 int main(int argc, char *argv[]) {
+    // Silence benign xdg-desktop-portal re-registration warnings when launched
+    // from an environment that already associated the session D-Bus connection.
+    QLoggingCategory::setFilterRules(QStringLiteral("qt.qpa.services.warning=false"));
+
     if (argc > 1 && QString::fromUtf8(argv[1]) != QLatin1String("open")) {
         qputenv("QT_QPA_PLATFORM", QByteArrayLiteral("offscreen"));
         QGuiApplication app(argc, argv);
         return runCli(argc, argv);
     }
 
+    // Set application metadata and desktop file name BEFORE constructing
+    // QGuiApplication so Qt registers the portal app_id only once on startup.
+    QCoreApplication::setApplicationName(QStringLiteral("skystrike"));
+    QCoreApplication::setApplicationVersion(QStringLiteral("0.2.0"));
+    QGuiApplication::setDesktopFileName(QStringLiteral("skystrike"));
+
     QGuiApplication app(argc, argv);
-    app.setApplicationName("skystrike");
-    app.setApplicationVersion("0.1.0");
+    app.setWindowIcon(QIcon::fromTheme(QStringLiteral("skystrike")));
 
-    app.setDesktopFileName("skystrike");
-    app.setWindowIcon(QIcon::fromTheme("skystrike"));
-
-    QQuickStyle::setStyle("Material");
+    QQuickStyle::setStyle(QStringLiteral("Material"));
 
     Translator translator;
     app.installTranslator(&translator);
@@ -104,10 +114,10 @@ int main(int argc, char *argv[]) {
 
     QQmlApplicationEngine engine;
     QObject::connect(&translator, &Translator::changed, &engine, &QQmlEngine::retranslate);
-    engine.rootContext()->setContextProperty("translator", &translator);
-    engine.rootContext()->setContextProperty("theme", &theme);
-    engine.rootContext()->setContextProperty("backend", &backend);
-    engine.load(QUrl("qrc:/Main.qml"));
+    engine.rootContext()->setContextProperty(QStringLiteral("translator"), &translator);
+    engine.rootContext()->setContextProperty(QStringLiteral("theme"), &theme);
+    engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
+    engine.load(QUrl(QStringLiteral("qrc:/Main.qml")));
     if (engine.rootObjects().isEmpty())
         return 1;
 
