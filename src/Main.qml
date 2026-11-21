@@ -39,10 +39,10 @@ ApplicationWindow {
         LayoutMirroring.childrenInherit: true
 
         // --- PLAYER B-2 SPIRIT STATE ---
-        property real playerX: 200
-        property real playerY: 250
-        property real targetX: 200
-        property real targetY: 250
+        property real playerX: 220
+        property real playerY: 270
+        property real targetX: 220
+        property real targetY: 270
         property real playerTilt: 0
         property real playerBank: 0
         property int bombBayOpenTicks: 0
@@ -52,7 +52,7 @@ ApplicationWindow {
 
         // --- GIANT AIRBORNE CARRIER / MOTHERSHIP ---
         property real bossX: win.width - 220
-        property real bossY: 135
+        property real bossY: 165
         property real bossVx: -1.1
         property real bossHealth: 140
         property real bossMaxHealth: 140
@@ -76,23 +76,24 @@ ApplicationWindow {
 
         function initEnvironment() {
             clouds = [
-                { x: 120, y: 85, s: 1.1, speed: 0.45, dark: true },
-                { x: 460, y: 145, s: 0.9, speed: 0.35, dark: false },
-                { x: 780, y: 70, s: 1.3, speed: 0.55, dark: true },
-                { x: 1080, y: 120, s: 1.0, speed: 0.40, dark: false }
+                { x: 120, y: 115, s: 1.1, speed: 0.45, dark: true },
+                { x: 460, y: 175, s: 0.9, speed: 0.35, dark: false },
+                { x: 780, y: 105, s: 1.3, speed: 0.55, dark: true },
+                { x: 1080, y: 150, s: 1.0, speed: 0.40, dark: false }
             ];
 
-            // Initial enemy warships on the sea
+            // Initial enemy warships on the sea (including one right below the bombing path)
             warships = [];
-            spawnWarship(win.width * 0.45, "destroyer");
-            spawnWarship(win.width * 0.78, "carrier");
-            spawnWarship(win.width * 1.08, "cruiser");
+            spawnWarship(340, "destroyer");
+            spawnWarship(640, "carrier");
+            spawnWarship(940, "cruiser");
 
             // Initial enemy fighter planes & paratroopers so action starts immediately
             smallPlanes = [];
-            spawnSmallPlane(win.width * 0.65, 190);
-            spawnSmallPlane(win.width * 0.80, 260);
-            spawnParatrooper(win.width * 0.55, 220);
+            spawnSmallPlane(580, 270);
+            spawnSmallPlane(760, 230);
+            spawnSmallPlane(880, 320);
+            spawnParatrooper(520, 240);
         }
 
         Component.onCompleted: {
@@ -306,9 +307,10 @@ ApplicationWindow {
                 if (root.invulnerableTicks > 0)
                     root.invulnerableTicks--;
 
-                // 1. B-2 Spirit smooth flight above sea level
-                var clampedTargetY = Math.min(root.targetY, root.seaLevel - 75);
-                var dx = root.targetX - root.playerX;
+                // 1. B-2 Spirit smooth flight clamped between HUD and sea level
+                var clampedTargetX = Math.max(65, Math.min(win.width - 65, root.targetX));
+                var clampedTargetY = Math.max(110, Math.min(root.targetY, root.seaLevel - 75));
+                var dx = clampedTargetX - root.playerX;
                 var dy = clampedTargetY - root.playerY;
                 root.playerX += dx * 0.14;
                 root.playerY += dy * 0.14;
@@ -325,7 +327,7 @@ ApplicationWindow {
                 // 3. Giant Mothership logic
                 if (root.bossActive) {
                     root.bossX += root.bossVx;
-                    root.bossY = 125 + Math.sin(root.seaTime * 0.7) * 18;
+                    root.bossY = 165 + Math.sin(root.seaTime * 0.7) * 18;
 
                     if (root.bossX < win.width * 0.48 && root.bossVx < 0)
                         root.bossVx = 0.85;
@@ -1079,84 +1081,93 @@ ApplicationWindow {
                 ctx.rotate(root.playerTilt);
 
                 // Concealed Dorsal Stealth Exhaust Glow (Twin recessed vents on top deck)
-                var jetGlow = 8 + Math.random() * 6;
-                ctx.fillStyle = "rgba(125, 207, 255, 0.75)";
+                var jetGlow = 12 + Math.random() * 8;
+                ctx.fillStyle = "rgba(255, 158, 100, 0.85)";
                 ctx.beginPath();
-                ctx.moveTo(-22, -11); ctx.lineTo(-22 - jetGlow, -9); ctx.lineTo(-22, -6);
-                ctx.moveTo(-22, 6);   ctx.lineTo(-22 - jetGlow, 9);  ctx.lineTo(-22, 11);
+                ctx.moveTo(-22, -13); ctx.lineTo(-22 - jetGlow, -10); ctx.lineTo(-22, -7);
+                ctx.moveTo(-22, 7);   ctx.lineTo(-22 - jetGlow, 10);  ctx.lineTo(-22, 13);
                 ctx.fill();
 
                 // Open Internal Bomb Bay Glow when releasing missiles/bombs
                 if (root.bombBayOpenTicks > 0) {
-                    ctx.fillStyle = "rgba(255, 158, 100, 0.45)";
+                    ctx.fillStyle = "rgba(255, 180, 90, 0.55)";
                     ctx.beginPath();
-                    ctx.ellipse(0, 6, 18, 8, 0, 0, 6.28);
+                    ctx.ellipse(2, 8, 20, 9, 0, 0, 6.28);
                     ctx.fill();
                 }
 
                 // B-2 Spirit Iconic Flying-Wing Silhouette with Sawtooth "W" Trailing Edge
-                var b2Grad = ctx.createLinearGradient(-35, -45, 45, 45);
-                b2Grad.addColorStop(0.0, "#353c4a");
-                b2Grad.addColorStop(0.5, "#1f242d");
-                b2Grad.addColorStop(1.0, "#14171d");
+                var b2Grad = ctx.createLinearGradient(-40, -58, 52, 58);
+                b2Grad.addColorStop(0.0, "#505a6e");
+                b2Grad.addColorStop(0.45, "#373f4f");
+                b2Grad.addColorStop(1.0, "#232834");
                 ctx.fillStyle = b2Grad;
-                ctx.strokeStyle = "#525c70";
-                ctx.lineWidth = 1.4;
+                ctx.strokeStyle = "#7c8aa6";
+                ctx.lineWidth = 1.6;
 
                 ctx.beginPath();
-                ctx.moveTo(44, 0);      // Sharp stealth nose beak
-                ctx.lineTo(-12, -54);   // Upper swept leading edge
-                ctx.lineTo(-26, -46);   // Upper clipped wingtip
-                ctx.lineTo(-14, -24);   // Upper outer sawtooth notch
-                ctx.lineTo(-28, -12);   // Upper inner sawtooth peak
-                ctx.lineTo(-18, 0);     // Center tail beaver-tail point
-                ctx.lineTo(-28, 12);    // Lower inner sawtooth peak
-                ctx.lineTo(-14, 24);    // Lower outer sawtooth notch
-                ctx.lineTo(-26, 46);    // Lower clipped wingtip
-                ctx.lineTo(-12, 54);    // Lower swept leading edge
+                ctx.moveTo(50, 0);      // Sharp stealth hawk-beak nose
+                ctx.lineTo(-14, -62);   // Upper straight swept leading edge
+                ctx.lineTo(-30, -52);   // Upper raked stealth wingtip
+                ctx.lineTo(-16, -28);   // Upper outer sawtooth notch
+                ctx.lineTo(-32, -14);   // Upper inner sawtooth peak
+                ctx.lineTo(-20, 0);     // Center beaver-tail trailing tip
+                ctx.lineTo(-32, 14);    // Lower inner sawtooth peak
+                ctx.lineTo(-16, 28);    // Lower outer sawtooth notch
+                ctx.lineTo(-30, 52);    // Lower raked stealth wingtip
+                ctx.lineTo(-14, 62);    // Lower straight swept leading edge
                 ctx.closePath();
                 ctx.fill();
                 ctx.stroke();
 
-                // Center Fuselage Blended Spine Highlight
-                ctx.fillStyle = "#2b313d";
+                // Leading-edge radar-absorbent metallic sheen
+                ctx.strokeStyle = "#9ab0d6";
+                ctx.lineWidth = 1.8;
                 ctx.beginPath();
-                ctx.moveTo(40, 0);
-                ctx.lineTo(2, -16);
-                ctx.lineTo(-22, -10);
-                ctx.lineTo(-16, 0);
-                ctx.lineTo(-22, 10);
-                ctx.lineTo(2, 16);
+                ctx.moveTo(-14, -62);
+                ctx.lineTo(50, 0);
+                ctx.lineTo(-14, 62);
+                ctx.stroke();
+
+                // Center Fuselage Blended Spine Highlight
+                ctx.fillStyle = "#434d61";
+                ctx.beginPath();
+                ctx.moveTo(45, 0);
+                ctx.lineTo(4, -18);
+                ctx.lineTo(-24, -11);
+                ctx.lineTo(-18, 0);
+                ctx.lineTo(-24, 11);
+                ctx.lineTo(4, 18);
                 ctx.closePath();
                 ctx.fill();
 
                 // Radar-Absorbent Stealth Panel Seam Lines
-                ctx.strokeStyle = "rgba(140, 160, 190, 0.22)";
+                ctx.strokeStyle = "rgba(175, 195, 225, 0.28)";
                 ctx.lineWidth = 1;
                 ctx.beginPath();
-                ctx.moveTo(16, -14); ctx.lineTo(-14, -44);
-                ctx.moveTo(16, 14);  ctx.lineTo(-14, 44);
-                ctx.moveTo(-6, -12); ctx.lineTo(-6, 12);
+                ctx.moveTo(18, -15); ctx.lineTo(-16, -50);
+                ctx.moveTo(18, 15);  ctx.lineTo(-16, 50);
+                ctx.moveTo(-7, -14); ctx.lineTo(-7, 14);
                 ctx.stroke();
 
                 // Twin Recessed Stealth Engine Intakes (S-duct serrated intakes)
-                ctx.fillStyle = "#101318";
+                ctx.fillStyle = "#161922";
                 ctx.beginPath();
-                ctx.moveTo(4, -12); ctx.lineTo(-6, -15); ctx.lineTo(-8, -8); ctx.closePath();
-                ctx.moveTo(4, 12);  ctx.lineTo(-6, 15);  ctx.lineTo(-8, 8);  ctx.closePath();
+                ctx.moveTo(5, -13); ctx.lineTo(-7, -17); ctx.lineTo(-10, -9); ctx.closePath();
+                ctx.moveTo(5, 13);  ctx.lineTo(-7, 17);  ctx.lineTo(-10, 9);  ctx.closePath();
                 ctx.fill();
 
                 // B-2 Spirit Flush Wrap-Around Metallic Cockpit Windscreens (4 angled panes)
-                ctx.fillStyle = "#89b4fa";
+                ctx.fillStyle = "#7dcfff";
                 ctx.beginPath();
-                ctx.moveTo(31, -2); ctx.lineTo(21, -9); ctx.lineTo(18, -3); ctx.closePath();
-                ctx.moveTo(31, 2);  ctx.lineTo(21, 9);  ctx.lineTo(18, 3);  ctx.closePath();
+                ctx.moveTo(36, -2); ctx.lineTo(24, -10); ctx.lineTo(20, -3); ctx.closePath();
+                ctx.moveTo(36, 2);  ctx.lineTo(24, 10);  ctx.lineTo(20, 3);  ctx.closePath();
                 ctx.fill();
 
-                ctx.fillStyle = "rgba(255, 214, 10, 0.35)"; // Gold radar-reflective tint
+                ctx.fillStyle = "#e0af68"; // Gold radar-reflective side pane tint
                 ctx.beginPath();
-                ctx.moveTo(20, -10); ctx.lineTo(13, -13); ctx.lineTo(14, -6); ctx.closePath();
-                ctx.moveTo(20, 10);  ctx.lineTo(13, 13);  ctx.lineTo(14, 6);  ctx.closePath();
+                ctx.moveTo(23, -11); ctx.lineTo(15, -15); ctx.lineTo(16, -7); ctx.closePath();
+                ctx.moveTo(23, 11);  ctx.lineTo(15, 15);  ctx.lineTo(16, 7);  ctx.closePath();
                 ctx.fill();
 
                 // Shield bubble when brushing past enemy planes
@@ -1216,13 +1227,17 @@ ApplicationWindow {
             acceptedButtons: Qt.LeftButton | Qt.RightButton
 
             onPositionChanged: function(mouse) {
+                if (mouse.x <= 1 && mouse.y <= 1)
+                    return;
                 root.targetX = mouse.x;
                 root.targetY = mouse.y;
             }
 
             onPressed: function(mouse) {
-                root.targetX = mouse.x;
-                root.targetY = mouse.y;
+                if (mouse.x > 1 || mouse.y > 1) {
+                    root.targetX = mouse.x;
+                    root.targetY = mouse.y;
+                }
                 if (mouse.button === Qt.RightButton)
                     root.dropCarpetBombs();
                 else
@@ -1325,9 +1340,7 @@ ApplicationWindow {
                 }
 
                 Button {
-                    text: "🚀 " + qsTr("Fire Missile & Drop Bomb")
-                    Material.background: theme.accent
-                    Material.foreground: theme.accentForeground
+                    text: "🚀 " + qsTr("Fire Missile + Bomb")
                     font.bold: true
                     onClicked: root.fireAllOrdnance()
                 }
