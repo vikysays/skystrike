@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Sky Strike
+Name[da]=Himmelangreb
+Comment=City defense aeroplane combat game
+Comment[da]=Byforsvar med Kampfly
+Exec=skystrike %f
+Icon=skystrike
+Terminal=false
+Categories=Game;ActionGame;
+StartupWMClass=skystrike

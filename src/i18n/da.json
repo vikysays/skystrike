@@ -1,0 +1,18 @@
+{
+  "Sky Strike": "Himmelangreb",
+  "City Defense Aeroplane Action": "Byforsvar med Kampfly",
+  "Score: %1": "Point: %1",
+  "High: %1": "Rekord: %1",
+  "Rescued: %1": "Reddet: %1",
+  "Wave %1": "Bølge %1",
+  "Click or Space: Launch Missiles": "Klik eller Mellemrum: Affyr missiler",
+  "Mouse: Fly Aeroplane": "Mus: Styr flyet",
+  "Save the Paratroopers!": "Red faldskærmssoldaterne!",
+  "Big Mothership Detected!": "Stort moderskib opdaget!",
+  "Pause": "Pause",
+  "Resume": "Genoptag",
+  "New Game": "Nyt spil",
+  "Quit": "Afslut",
+  "%n planes": { "one": "%n fly", "other": "%n fly" },
+  "%n soldiers": { "one": "%n soldat", "other": "%n soldater" }
+}

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e2238"/>
+      <stop offset="100%" stop-color="#0e101a"/>
+    </linearGradient>
+    <linearGradient id="plane" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7aa2f7"/>
+      <stop offset="100%" stop-color="#3d59a1"/>
+    </linearGradient>
+    <linearGradient id="fire" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff9e64"/>
+      <stop offset="100%" stop-color="#f7768e"/>
+    </linearGradient>
+  </defs>
+  <!-- App Icon Base -->
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  
+  <!-- Thrust Flame -->
+  <polygon points="32,54 28,42 36,42" fill="url(#fire)"/>
+  <polygon points="32,50 30,42 34,42" fill="#ffc777"/>
+
+  <!-- Wings -->
+  <polygon points="32,18 10,40 18,44 32,38 46,44 54,40" fill="url(#plane)"/>
+  <!-- Jet Body -->
+  <polygon points="32,10 27,38 32,44 37,38" fill="#c0caf5"/>
+  <!-- Cockpit Canopy -->
+  <ellipse cx="32" cy="26" rx="2.5" ry="6" fill="#7dcfff"/>
+  <!-- Wing Missiles -->
+  <rect x="14" y="32" width="2.5" height="10" rx="1" fill="#f7768e"/>
+  <rect x="47.5" y="32" width="2.5" height="10" rx="1" fill="#f7768e"/>
+</svg>

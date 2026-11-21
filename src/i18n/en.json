@@ -1,0 +1,18 @@
+{
+  "Sky Strike": "Sky Strike",
+  "City Defense Aeroplane Action": "City Defense Aeroplane Action",
+  "Score: %1": "Score: %1",
+  "High: %1": "High: %1",
+  "Rescued: %1": "Rescued: %1",
+  "Wave %1": "Wave %1",
+  "Click or Space: Launch Missiles": "Click or Space: Launch Missiles",
+  "Mouse: Fly Aeroplane": "Mouse: Fly Aeroplane",
+  "Save the Paratroopers!": "Save the Paratroopers!",
+  "Big Mothership Detected!": "Big Mothership Detected!",
+  "Pause": "Pause",
+  "Resume": "Resume",
+  "New Game": "New Game",
+  "Quit": "Quit",
+  "%n planes": { "one": "%n plane", "other": "%n planes" },
+  "%n soldiers": { "one": "%n soldier", "other": "%n soldiers" }
+}

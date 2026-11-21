@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+"$ROOT/bin/build"
+cd "$ROOT/pkgbuild"
+
+install -Dm755 "$ROOT/build/skystrike" "$HOME/.local/bin/skystrike"
+install -Dm644 "$ROOT/pkgbuild/skystrike.svg" "$HOME/.local/share/icons/hicolor/scalable/apps/skystrike.svg"
+mkdir -p "$HOME/.local/share/applications"
+sed "s|^Exec=skystrike %f$|Exec=$HOME/.local/bin/skystrike %f|" "$ROOT/pkgbuild/skystrike.desktop" > "$HOME/.local/share/applications/skystrike.desktop"
+update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+
+if sudo -n true 2>/dev/null; then
+    exec makepkg -fsi "$@"
+else
+    makepkg -f "$@" || true
+    echo "Installed skystrike to ~/.local/bin and desktop launcher entry."
+fi
