@@ -7,4 +7,4 @@ cd "$ROOT/build/tests"
 
 qmake6 "$ROOT/tests/skystrike_tests.pro"
 make -j"$(nproc)"
-QT_QPA_PLATFORM=offscreen ./skystrike_tests
+QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME="" ./skystrike_tests

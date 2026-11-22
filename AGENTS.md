@@ -13,10 +13,16 @@ This document preserves the full design context, requirements, and technical arc
 - **Wartime Seascape & Enemy Fleet**:
   - Stormy wartime ocean below with multi-layered rolling waves, whitecaps, distant horizon artillery glow, and sweeping naval searchlights.
   - **Enemy Warships**: Destroyers, guided-missile cruisers, and aircraft carriers steaming across the sea. Bomb hits ignite deck fires and black smoke until magazine detonation sinks the ship.
-- **Airborne Mothership, Small Planes & Paratroopers**:
-  - A giant airborne carrier/mothership patrols the upper sky, opening its hangar bay doors to launch agile red fighter planes.
-  - Paratrooper soldiers jump out with colorful parachutes and drift toward the sea; flying the B-2 Spirit near them rescues them for `+500` star bonus points.
-- **Kid-Friendly Flow**: Colliding with enemy planes triggers a brief energy shield and knocks the enemy plane out without a punishing Game Over screen.
+- **3-Level Campaign & Boss Aeroplanes**:
+  - **Level 1 — Iron Vulture Bomber (150 HP)**: Gunmetal twin-wing carrier with targeted cannon fire and fighter escort launches.
+    - *Player Capability (Tier 1)*: 1 Heavy Cruise Missile + 1 Gravity Bomb + 4-Bomb Carpet Salvo.
+  - **Level 2 — Storm Valkyrie Gunship (280 HP)**: Crimson forward-swept gunship with swooping mid-sky flight, dual fighter launches, and 3-way cannon spreads.
+    - *Player Capability (Tier 2)*: Twin Supersonic Homing Cruise Missiles + Dual Cluster Bombs + 6-Bomb Carpet Salvo + Wingtip Hardpoint Pods.
+  - **Level 3 — Sky Titan Dreadnought (440 HP)**: Obsidian-and-gold tri-hull aerial dreadnought with a periodic pulsing energy shield dome, 5-way plasma spreads, and maximum air/naval escorts.
+    - *Player Capability (Tier 3)*: Triple Homing Cruise Missiles + Nose Plasma Laser Beam + 3 Heavy Bombs + 8-Bomb Mega Carpet Salvo.
+  - Defeating each Boss Aeroplane advances the player to the next level and unlocks the next weapon tier; defeating Level 3's Sky Titan Dreadnought triggers the Campaign Victory screen (while preserving future extensibility to 10 levels).
+  - Keys `1`, `2`, `3` allow jumping directly to any of the 3 levels.
+- **Kid-Friendly Flow**: Colliding with enemy planes or boss plasma shots triggers a brief energy shield (`SHIELD DEFLECT!`) and knocks enemy planes out without a punishing Game Over screen.
 
 ## 2. Architecture (`omarchy-app` conventions)
 

@@ -52,18 +52,56 @@ void Backend::recordShipDestroyed() {
     setStatusMessage(QStringLiteral("WARSHIP SUNK! +800"));
 }
 
+QString Backend::weaponName() const {
+    if (m_wave == 1)
+        return QStringLiteral("Tier 1: Heavy Cruise Missile + Bomb");
+    if (m_wave == 2)
+        return QStringLiteral("Tier 2: Twin Supersonic Missiles + Dual Cluster Bombs");
+    return QStringLiteral("Tier 3: Triple Homing Missiles + Nose Laser + Mega Bombs");
+}
+
+QString Backend::bossName() const {
+    if (m_wave == 1)
+        return QStringLiteral("Iron Vulture Bomber");
+    if (m_wave == 2)
+        return QStringLiteral("Storm Valkyrie Gunship");
+    return QStringLiteral("Sky Titan Dreadnought");
+}
+
 void Backend::recordMothershipDefeated() {
     ++m_mothershipsDefeated;
     emit mothershipsDefeatedChanged();
-    addScore(2500);
-    setStatusMessage(QStringLiteral("MOTHERSHIP DESTROYED! +2500"));
-    nextWave();
+    addScore(2500 * m_wave);
+    if (m_wave < maxLevels()) {
+        nextWave();
+    } else {
+        m_victory = true;
+        emit victoryChanged();
+        setStatusMessage(QStringLiteral("ALL 3 BOSS AEROPLANES DEFEATED! VICTORY!"));
+    }
 }
 
 void Backend::nextWave() {
-    ++m_wave;
+    if (m_wave < maxLevels()) {
+        ++m_wave;
+        emit waveChanged();
+        emit levelChanged();
+        emit weaponTierChanged();
+        setStatusMessage(QStringLiteral("LEVEL %1 — %2 UNLOCKED!").arg(m_wave).arg(weaponName()));
+    }
+}
+
+void Backend::selectLevel(int lvl) {
+    const int clamped = qBound(1, lvl, maxLevels());
+    m_wave = clamped;
+    m_victory = false;
     emit waveChanged();
-    setStatusMessage(QStringLiteral("WAVE %1").arg(m_wave));
+    emit levelChanged();
+    emit weaponTierChanged();
+    emit victoryChanged();
+    ++m_resetTrigger;
+    emit resetTriggerChanged();
+    setStatusMessage(QStringLiteral("LEVEL %1: %2").arg(m_wave).arg(bossName()));
 }
 
 void Backend::togglePause() {
@@ -78,15 +116,21 @@ void Backend::resetGame() {
     m_shipsDestroyed = 0;
     m_mothershipsDefeated = 0;
     m_wave = 1;
+    m_victory = false;
     m_paused = false;
+    ++m_resetTrigger;
     emit scoreChanged();
     emit rescuesChanged();
     emit planesDestroyedChanged();
     emit shipsDestroyedChanged();
     emit mothershipsDefeatedChanged();
     emit waveChanged();
+    emit levelChanged();
+    emit weaponTierChanged();
+    emit victoryChanged();
     emit pausedChanged();
-    setStatusMessage(QStringLiteral("B-2 SPIRIT AIRBORNE!"));
+    emit resetTriggerChanged();
+    setStatusMessage(QStringLiteral("LEVEL 1: B-2 SPIRIT AIRBORNE!"));
 }
 
 void Backend::setStatusMessage(const QString &msg) {

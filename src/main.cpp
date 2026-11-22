@@ -63,6 +63,11 @@ int runCli(int argc, char *argv[]) {
             {QStringLiteral("planesDestroyed"), backend.planesDestroyed()},
             {QStringLiteral("shipsDestroyed"), backend.shipsDestroyed()},
             {QStringLiteral("mothershipsDefeated"), backend.mothershipsDefeated()},
+            {QStringLiteral("level"), backend.level()},
+            {QStringLiteral("maxLevels"), backend.maxLevels()},
+            {QStringLiteral("weaponTier"), backend.weaponTier()},
+            {QStringLiteral("weaponName"), backend.weaponName()},
+            {QStringLiteral("bossName"), backend.bossName()},
             {QStringLiteral("wave"), backend.wave()}
         };
         if (jsonOut) {
@@ -70,7 +75,9 @@ int runCli(int argc, char *argv[]) {
         } else {
             QTextStream(stdout) << "Sky Strike Stats:\n"
                                 << "  High Score: " << backend.highScore() << "\n"
-                                << "  Current Wave: " << backend.wave() << "\n"
+                                << "  Current Level: " << backend.level() << " / " << backend.maxLevels() << "\n"
+                                << "  Weapon System: " << backend.weaponName() << "\n"
+                                << "  Target Boss: " << backend.bossName() << "\n"
                                 << "  Ships Sunk: " << backend.shipsDestroyed() << "\n"
                                 << "  Planes Destroyed: " << backend.planesDestroyed() << "\n"
                                 << "  Rescues: " << backend.rescues() << "\n";
@@ -91,6 +98,7 @@ int main(int argc, char *argv[]) {
 
     if (argc > 1 && QString::fromUtf8(argv[1]) != QLatin1String("open")) {
         qputenv("QT_QPA_PLATFORM", QByteArrayLiteral("offscreen"));
+        qputenv("QT_QPA_PLATFORMTHEME", QByteArrayLiteral(""));
         QGuiApplication app(argc, argv);
         return runCli(argc, argv);
     }

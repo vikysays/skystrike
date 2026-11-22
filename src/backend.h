@@ -12,8 +12,15 @@ class Backend : public QObject {
     Q_PROPERTY(int shipsDestroyed READ shipsDestroyed NOTIFY shipsDestroyedChanged)
     Q_PROPERTY(int mothershipsDefeated READ mothershipsDefeated NOTIFY mothershipsDefeatedChanged)
     Q_PROPERTY(int wave READ wave NOTIFY waveChanged)
+    Q_PROPERTY(int level READ level NOTIFY levelChanged)
+    Q_PROPERTY(int maxLevels READ maxLevels CONSTANT)
+    Q_PROPERTY(int weaponTier READ weaponTier NOTIFY weaponTierChanged)
+    Q_PROPERTY(QString weaponName READ weaponName NOTIFY weaponTierChanged)
+    Q_PROPERTY(QString bossName READ bossName NOTIFY levelChanged)
+    Q_PROPERTY(bool victory READ victory NOTIFY victoryChanged)
     Q_PROPERTY(bool paused READ paused NOTIFY pausedChanged)
     Q_PROPERTY(int fireTrigger READ fireTrigger NOTIFY fireTriggerChanged)
+    Q_PROPERTY(int resetTrigger READ resetTrigger NOTIFY resetTriggerChanged)
     Q_PROPERTY(QString statusMessage READ statusMessage NOTIFY statusMessageChanged)
 
 public:
@@ -26,8 +33,15 @@ public:
     int shipsDestroyed() const { return m_shipsDestroyed; }
     int mothershipsDefeated() const { return m_mothershipsDefeated; }
     int wave() const { return m_wave; }
+    int level() const { return m_wave; }
+    int maxLevels() const { return 3; }
+    int weaponTier() const { return m_wave; }
+    QString weaponName() const;
+    QString bossName() const;
+    bool victory() const { return m_victory; }
     bool paused() const { return m_paused; }
     int fireTrigger() const { return m_fireTrigger; }
+    int resetTrigger() const { return m_resetTrigger; }
     QString statusMessage() const { return m_statusMessage; }
 
     Q_INVOKABLE void primaryAction();
@@ -37,6 +51,7 @@ public:
     Q_INVOKABLE void recordShipDestroyed();
     Q_INVOKABLE void recordMothershipDefeated();
     Q_INVOKABLE void nextWave();
+    Q_INVOKABLE void selectLevel(int lvl);
     Q_INVOKABLE void togglePause();
     Q_INVOKABLE void resetGame();
     Q_INVOKABLE void setStatusMessage(const QString &msg);
@@ -52,8 +67,12 @@ signals:
     void shipsDestroyedChanged();
     void mothershipsDefeatedChanged();
     void waveChanged();
+    void levelChanged();
+    void weaponTierChanged();
+    void victoryChanged();
     void pausedChanged();
     void fireTriggerChanged();
+    void resetTriggerChanged();
     void statusMessageChanged();
 
 private:
@@ -65,7 +84,9 @@ private:
     int m_shipsDestroyed = 0;
     int m_mothershipsDefeated = 0;
     int m_wave = 1;
+    bool m_victory = false;
     bool m_paused = false;
     int m_fireTrigger = 0;
+    int m_resetTrigger = 0;
     QString m_statusMessage;
 };

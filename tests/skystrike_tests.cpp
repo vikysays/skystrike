@@ -41,12 +41,34 @@ private slots:
     void bossDefeatAdvancesWave() {
         QTemporaryDir dir;
         Backend backend(dir.path() + "/test_stats.json");
-        QCOMPARE(backend.wave(), 1);
+        QCOMPARE(backend.level(), 1);
+        QCOMPARE(backend.maxLevels(), 3);
+        QCOMPARE(backend.weaponTier(), 1);
+        QCOMPARE(backend.bossName(), QString("Iron Vulture Bomber"));
+        QCOMPARE(backend.victory(), false);
 
+        // Defeating Level 1 Boss advances to Level 2 & unlocks Tier 2 weapons
         backend.recordMothershipDefeated();
         QCOMPARE(backend.mothershipsDefeated(), 1);
-        QCOMPARE(backend.wave(), 2);
+        QCOMPARE(backend.level(), 2);
+        QCOMPARE(backend.weaponTier(), 2);
+        QCOMPARE(backend.bossName(), QString("Storm Valkyrie Gunship"));
+        QCOMPARE(backend.victory(), false);
         QVERIFY(backend.score() >= 2500);
+
+        // Defeating Level 2 Boss advances to Level 3 & unlocks Tier 3 weapons
+        backend.recordMothershipDefeated();
+        QCOMPARE(backend.mothershipsDefeated(), 2);
+        QCOMPARE(backend.level(), 3);
+        QCOMPARE(backend.weaponTier(), 3);
+        QCOMPARE(backend.bossName(), QString("Sky Titan Dreadnought"));
+        QCOMPARE(backend.victory(), false);
+
+        // Defeating Level 3 Final Boss completes the 3-level campaign with victory!
+        backend.recordMothershipDefeated();
+        QCOMPARE(backend.mothershipsDefeated(), 3);
+        QCOMPARE(backend.level(), 3);
+        QCOMPARE(backend.victory(), true);
     }
 
     void themeFallsBack() {

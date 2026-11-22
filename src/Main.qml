@@ -24,11 +24,17 @@ ApplicationWindow {
     Shortcut { sequence: "Space"; context: Qt.ApplicationShortcut; onActivated: root.fireAllOrdnance() }
     Shortcut { sequence: "B"; context: Qt.ApplicationShortcut; onActivated: root.dropCarpetBombs() }
     Shortcut { sequence: "P"; context: Qt.ApplicationShortcut; onActivated: backend.togglePause() }
+    Shortcut { sequence: "1"; context: Qt.ApplicationShortcut; onActivated: backend.selectLevel(1) }
+    Shortcut { sequence: "2"; context: Qt.ApplicationShortcut; onActivated: backend.selectLevel(2) }
+    Shortcut { sequence: "3"; context: Qt.ApplicationShortcut; onActivated: backend.selectLevel(3) }
 
     Connections {
         target: backend
         function onFireTriggerChanged() {
             root.fireAllOrdnance();
+        }
+        function onResetTriggerChanged() {
+            root.setupLevel(backend.level);
         }
     }
 
@@ -49,16 +55,21 @@ ApplicationWindow {
         property int invulnerableTicks: 0
         property real shakeIntensity: 0
         property real seaTime: 0
+        property int levelBannerTicks: 150
 
-        // --- GIANT AIRBORNE CARRIER / MOTHERSHIP ---
-        property real bossX: win.width - 220
-        property real bossY: 165
+        // --- BOSS AEROPLANE STATE (LEVELS 1, 2, 3) ---
+        property real bossX: win.width - 230
+        property real bossY: 170
         property real bossVx: -1.1
-        property real bossHealth: 140
-        property real bossMaxHealth: 140
+        property real bossVy: 0.6
+        property real bossHealth: 160
+        property real bossMaxHealth: 160
         property bool bossHangarOpen: false
         property int bossSpawnTimer: 0
+        property int bossFireTimer: 0
         property bool bossActive: true
+        property bool bossShieldActive: false
+        property int levelTransitionTicks: 0
 
         // --- DYNAMIC ENTITIES ---
         property var smallPlanes: []
@@ -66,6 +77,8 @@ ApplicationWindow {
         property var paratroopers: []
         property var missiles: []
         property var bombs: []
+        property var laserBeams: []
+        property var bossBullets: []
         property var particles: []
         property var shockwaves: []
         property var splashes: []
@@ -74,6 +87,53 @@ ApplicationWindow {
 
         readonly property real seaLevel: win.height - 105
 
+        function bossMaxHpForLevel(lvl) {
+            if (lvl === 1) return 150;
+            if (lvl === 2) return 280;
+            return 440;
+        }
+
+        function setupLevel(lvl) {
+            bossActive = true;
+            bossX = win.width - 230;
+            bossY = 170;
+            bossVx = -(1.0 + lvl * 0.25);
+            bossVy = 0.6 + lvl * 0.25;
+            bossMaxHealth = bossMaxHpForLevel(lvl);
+            bossHealth = bossMaxHealth;
+            bossHangarOpen = false;
+            bossSpawnTimer = 0;
+            bossFireTimer = 0;
+            bossShieldActive = false;
+            levelTransitionTicks = 0;
+            levelBannerTicks = 170;
+            bossBullets = [];
+            laserBeams = [];
+
+            // Enemy warships on the sea scaled by level complexity
+            warships = [];
+            spawnWarship(340, "destroyer");
+            spawnWarship(640, "carrier");
+            spawnWarship(940, "cruiser");
+            if (lvl >= 2)
+                spawnWarship(500, "cruiser");
+            if (lvl >= 3)
+                spawnWarship(800, "carrier");
+
+            // Enemy fighter squadron scaled by level complexity
+            smallPlanes = [];
+            spawnSmallPlane(580, 270);
+            spawnSmallPlane(760, 230);
+            spawnSmallPlane(880, 320);
+            if (lvl >= 2)
+                spawnSmallPlane(670, 195);
+            if (lvl >= 3) {
+                spawnSmallPlane(720, 360);
+                spawnSmallPlane(940, 250);
+            }
+            spawnParatrooper(520, 240);
+        }
+
         function initEnvironment() {
             clouds = [
                 { x: 120, y: 115, s: 1.1, speed: 0.45, dark: true },
@@ -81,19 +141,7 @@ ApplicationWindow {
                 { x: 780, y: 105, s: 1.3, speed: 0.55, dark: true },
                 { x: 1080, y: 150, s: 1.0, speed: 0.40, dark: false }
             ];
-
-            // Initial enemy warships on the sea (including one right below the bombing path)
-            warships = [];
-            spawnWarship(340, "destroyer");
-            spawnWarship(640, "carrier");
-            spawnWarship(940, "cruiser");
-
-            // Initial enemy fighter planes & paratroopers so action starts immediately
-            smallPlanes = [];
-            spawnSmallPlane(580, 270);
-            spawnSmallPlane(760, 230);
-            spawnSmallPlane(880, 320);
-            spawnParatrooper(520, 240);
+            setupLevel(backend.level);
         }
 
         Component.onCompleted: {
@@ -229,64 +277,147 @@ ApplicationWindow {
             });
         }
 
-        // Fires both a big Cruise Missile forward AND drops a heavy gravity bomb downward
+        // Fires player ordnance scaled by Level / Weapon Tier (1, 2, 3)!
         function fireAllOrdnance() {
-            if (backend.paused) return;
+            if (backend.paused || backend.victory) return;
             root.bombBayOpenTicks = 24;
+            var tier = backend.weaponTier;
 
-            // 1. Heavy Cruise Missile (forward)
-            missiles.push({
-                x: playerX + 26,
-                y: playerY + 4,
-                vx: 5.5,
-                ax: 0.35,
-                vy: 0,
-                life: 140
-            });
-
-            // 2. Heavy Gravity Bomb (drops from B-2 Spirit internal bomb bay onto planes & ships below)
-            bombs.push({
-                x: playerX - 4,
-                y: playerY + 14,
-                vx: 2.2,
-                vy: 1.8,
-                gravity: 0.22,
-                angle: 0.4,
-                life: 200
-            });
+            if (tier === 1) {
+                // LEVEL 1 (TIER 1): 1 Heavy Cruise Missile + 1 Heavy Gravity Bomb
+                missiles.push({
+                    x: playerX + 26, y: playerY + 4,
+                    vx: 5.8, ax: 0.35, vy: 0,
+                    homing: false, dmg: 16, life: 145
+                });
+                bombs.push({
+                    x: playerX - 4, y: playerY + 14,
+                    vx: 2.2, vy: 1.8, gravity: 0.22, angle: 0.4, dmg: 2, life: 200
+                });
+            } else if (tier === 2) {
+                // LEVEL 2 (TIER 2): Twin Supersonic Cruise Missiles + Dual Cluster Bombs
+                missiles.push({
+                    x: playerX + 24, y: playerY - 12,
+                    vx: 6.5, ax: 0.40, vy: -0.35,
+                    homing: true, dmg: 18, life: 150
+                });
+                missiles.push({
+                    x: playerX + 24, y: playerY + 14,
+                    vx: 6.5, ax: 0.40, vy: 0.35,
+                    homing: true, dmg: 18, life: 150
+                });
+                bombs.push({
+                    x: playerX - 8, y: playerY + 14,
+                    vx: 1.8, vy: 1.6, gravity: 0.23, angle: 0.4, dmg: 2, life: 200
+                });
+                bombs.push({
+                    x: playerX + 8, y: playerY + 16,
+                    vx: 2.7, vy: 1.9, gravity: 0.23, angle: 0.4, dmg: 2, life: 200
+                });
+            } else {
+                // LEVEL 3 (TIER 3): Triple Homing Missiles + Plasma Nose Laser Beam + 3 Heavy Bombs!
+                for (var mIdx = -1; mIdx <= 1; ++mIdx) {
+                    missiles.push({
+                        x: playerX + 26, y: playerY + mIdx * 13,
+                        vx: 7.2, ax: 0.45, vy: mIdx * 0.9,
+                        homing: true, dmg: 20, life: 160
+                    });
+                }
+                for (var bIdx = 0; bIdx < 3; ++bIdx) {
+                    bombs.push({
+                        x: playerX - 12 + bIdx * 12, y: playerY + 14 + bIdx * 3,
+                        vx: 1.7 + bIdx * 0.65, vy: 1.6 + bIdx * 0.3, gravity: 0.24, angle: 0.4, dmg: 3, life: 210
+                    });
+                }
+                // High-energy nose plasma laser pulse that strikes targets ahead!
+                var beamEndX = win.width;
+                if (root.bossActive && Math.abs(root.bossY - root.playerY) < 62 && root.bossX > root.playerX) {
+                    beamEndX = root.bossX - 30;
+                    var laserDmg = root.bossShieldActive ? 5 : 14;
+                    root.bossHealth -= laserDmg;
+                    root.spawnDramaticExplosion(beamEndX, root.playerY, 0.9, false);
+                    root.checkBossDefeated();
+                }
+                laserBeams.push({
+                    x1: playerX + 46, y1: playerY,
+                    x2: beamEndX, y2: playerY,
+                    alpha: 1.0
+                });
+            }
 
             // Launch flash particles under bomb bay
-            for (var i = 0; i < 6; ++i) {
+            for (var i = 0; i < 6 + tier * 2; ++i) {
                 particles.push({
-                    x: playerX + 10,
-                    y: playerY + 10,
+                    x: playerX + 12,
+                    y: playerY + 8,
                     vx: -(2 + Math.random() * 3),
-                    vy: (Math.random() - 0.5) * 2,
+                    vy: (Math.random() - 0.5) * 2.5,
                     life: 0.9,
                     decay: 0.08,
-                    color: "#ffd60a",
+                    color: tier === 3 ? "#7dcfff" : "#ffd60a",
                     size: 5,
                     smoke: false
                 });
             }
         }
 
-        // Drops a dramatic 4-bomb carpet bombing salvo from the B-2 Spirit
+        // Drops a dramatic carpet bombing salvo scaled by Weapon Tier (4 / 6 / 8 bombs)
         function dropCarpetBombs() {
-            if (backend.paused) return;
-            root.bombBayOpenTicks = 38;
-            for (var b = 0; b < 4; ++b) {
+            if (backend.paused || backend.victory) return;
+            root.bombBayOpenTicks = 42;
+            var tier = backend.weaponTier;
+            var count = 2 + tier * 2; // Level 1: 4 bombs, Level 2: 6 bombs, Level 3: 8 bombs
+            for (var b = 0; b < count; ++b) {
                 bombs.push({
-                    x: playerX - 16 + b * 12,
-                    y: playerY + 14 + b * 4,
-                    vx: 1.6 + b * 0.45,
-                    vy: 1.5 + b * 0.35,
+                    x: playerX - 18 + b * 10,
+                    y: playerY + 14 + b * 3,
+                    vx: 1.4 + b * 0.42,
+                    vy: 1.4 + b * 0.32,
                     gravity: 0.22,
                     angle: 0.4,
+                    dmg: tier >= 3 ? 3 : 2,
                     life: 220
                 });
             }
-            addFloatingText("BOMBS AWAY!", playerX, playerY - 30, "#ff9e64");
+            addFloatingText(tier >= 3 ? "MEGA CARPET SALVO!" : "BOMBS AWAY!", playerX, playerY - 30, "#ff9e64");
+        }
+
+        function checkBossDefeated() {
+            if (!root.bossActive || root.bossHealth > 0)
+                return;
+            root.bossActive = false;
+            root.bossBullets = [];
+            var completedLevel = backend.level;
+            root.spawnDramaticExplosion(root.bossX, root.bossY, 2.6, false);
+            root.spawnDramaticExplosion(root.bossX - 60, root.bossY + 14, 1.9, false);
+            root.spawnDramaticExplosion(root.bossX + 60, root.bossY - 14, 1.9, false);
+            root.spawnDramaticExplosion(root.bossX, root.bossY - 35, 1.7, false);
+
+            backend.recordMothershipDefeated();
+
+            if (completedLevel < backend.maxLevels) {
+                root.addFloatingText("LEVEL " + completedLevel + " BOSS DEFEATED! 💥", root.bossX - 80, root.bossY, "#9ece6a");
+                root.levelTransitionTicks = 110;
+            } else {
+                root.addFloatingText("SKY TITAN OBLITERATED! 🏆 VICTORY!", root.bossX - 110, root.bossY, "#ffd60a");
+            }
+        }
+
+        function fireBossSpread(lvl) {
+            var count = (lvl === 1) ? 1 : (lvl === 2 ? 3 : 5);
+            for (var i = 0; i < count; ++i) {
+                var offsetAngle = (i - (count - 1) * 0.5) * 0.22;
+                var aimAngle = Math.atan2(root.playerY - root.bossY, root.playerX - root.bossX) + offsetAngle;
+                var speed = 4.2 + lvl * 0.65;
+                root.bossBullets.push({
+                    x: root.bossX - 75,
+                    y: root.bossY + (i - (count - 1) * 0.5) * 10,
+                    vx: Math.cos(aimAngle) * speed,
+                    vy: Math.sin(aimAngle) * speed,
+                    color: lvl === 3 ? "#bb9af7" : (lvl === 2 ? "#ff9e64" : "#ff4d4d"),
+                    radius: lvl === 3 ? 6.5 : 5.5
+                });
+            }
         }
 
         // --- MAIN 60FPS GAME LOOP ---
@@ -306,6 +437,8 @@ ApplicationWindow {
                     root.bombBayOpenTicks--;
                 if (root.invulnerableTicks > 0)
                     root.invulnerableTicks--;
+                if (root.levelBannerTicks > 0)
+                    root.levelBannerTicks--;
 
                 // 1. B-2 Spirit smooth flight clamped between HUD and sea level
                 var clampedTargetX = Math.max(65, Math.min(win.width - 65, root.targetX));
@@ -324,38 +457,98 @@ ApplicationWindow {
                         root.clouds[cli].x = win.width + 80;
                 }
 
-                // 3. Giant Mothership logic
+                // 3. Boss Aeroplane logic across 3 complexity levels
+                var lvl = backend.level;
                 if (root.bossActive) {
                     root.bossX += root.bossVx;
-                    root.bossY = 165 + Math.sin(root.seaTime * 0.7) * 18;
+                    if (lvl === 1) {
+                        // Level 1 Boss: Iron Vulture Bomber (steady upper patrol)
+                        root.bossY = 165 + Math.sin(root.seaTime * 0.7) * 26;
+                    } else if (lvl === 2) {
+                        // Level 2 Boss: Storm Valkyrie Gunship (agile swooping flight across mid-sky)
+                        root.bossY = 215 + Math.sin(root.seaTime * 1.15) * 85;
+                    } else {
+                        // Level 3 Boss: Sky Titan Dreadnought (aggressive figure-8 aerial dominance + energy shield pulses)
+                        root.bossY = 235 + Math.sin(root.seaTime * 1.35) * 115;
+                        root.bossShieldActive = (Math.floor(root.seaTime * 1.2) % 4 === 3);
+                    }
 
-                    if (root.bossX < win.width * 0.48 && root.bossVx < 0)
-                        root.bossVx = 0.85;
-                    else if (root.bossX > win.width - 170 && root.bossVx > 0)
-                        root.bossVx = -0.85;
+                    var minBossX = (lvl === 3) ? win.width * 0.42 : win.width * 0.48;
+                    var spdX = 0.85 + lvl * 0.35;
+                    if (root.bossX < minBossX && root.bossVx < 0)
+                        root.bossVx = spdX;
+                    else if (root.bossX > win.width - 165 && root.bossVx > 0)
+                        root.bossVx = -spdX;
 
+                    // Boss launches fighter escorts & paratroopers
                     root.bossSpawnTimer++;
-                    if (root.bossSpawnTimer % 85 === 0) {
+                    var spawnInterval = Math.max(48, 95 - lvl * 15);
+                    if (root.bossSpawnTimer % spawnInterval === 0) {
                         root.bossHangarOpen = true;
-                        root.spawnSmallPlane(root.bossX - 20, root.bossY + 24);
-                        if (Math.random() > 0.35) {
+                        root.spawnSmallPlane(root.bossX - 24, root.bossY + 24);
+                        if (lvl >= 2)
+                            root.spawnSmallPlane(root.bossX - 10, root.bossY - 22);
+                        if (Math.random() > 0.30) {
                             root.spawnParatrooper(root.bossX + 25, root.bossY + 28);
-                            root.spawnParatrooper(root.bossX + 50, root.bossY + 28);
+                            if (lvl >= 2)
+                                root.spawnParatrooper(root.bossX + 52, root.bossY + 28);
                         }
-                    } else if (root.bossSpawnTimer % 85 === 30) {
+                    } else if (root.bossSpawnTimer % spawnInterval === 28) {
                         root.bossHangarOpen = false;
                     }
-                } else {
-                    if (Math.random() < 0.009) {
-                        root.bossActive = true;
-                        root.bossX = win.width + 130;
-                        root.bossY = 125;
-                        root.bossVx = -1.1;
-                        root.bossMaxHealth = 140 + backend.wave * 35;
-                        root.bossHealth = root.bossMaxHealth;
-                        backend.setStatusMessage(qsTr("Big Mothership Detected!"));
+
+                    // Boss fires aerial plasma/cannon spreads based on level complexity
+                    root.bossFireTimer++;
+                    var fireInterval = (lvl === 1) ? 95 : (lvl === 2 ? 70 : 52);
+                    if (root.bossFireTimer % fireInterval === 0) {
+                        root.fireBossSpread(lvl);
+                    }
+                } else if (!backend.victory) {
+                    // Transition countdown to spawn the newly unlocked Level Boss Aeroplane!
+                    if (root.levelTransitionTicks > 0) {
+                        root.levelTransitionTicks--;
+                        if (root.levelTransitionTicks === 0) {
+                            root.setupLevel(backend.level);
+                        }
                     }
                 }
+
+                // 3b. Boss Aeroplane cannon/plasma projectiles update
+                var nextBossBullets = [];
+                for (var bbi = 0; bbi < root.bossBullets.length; ++bbi) {
+                    var bb = root.bossBullets[bbi];
+                    bb.x += bb.vx;
+                    bb.y += bb.vy;
+                    var distPlayer = Math.hypot(bb.x - root.playerX, bb.y - root.playerY);
+                    if (distPlayer < 38) {
+                        // Kid-friendly energy shield deflects boss shots with sparks!
+                        root.invulnerableTicks = 35;
+                        root.shakeIntensity = Math.min(12, root.shakeIntensity + 4);
+                        root.addFloatingText("SHIELD DEFLECT!", root.playerX - 20, root.playerY - 35, "#7dcfff");
+                        for (var spk = 0; spk < 8; ++spk) {
+                            var spAng = Math.random() * 6.28;
+                            root.particles.push({
+                                x: bb.x, y: bb.y,
+                                vx: Math.cos(spAng) * 3.2, vy: Math.sin(spAng) * 3.2,
+                                life: 0.8, decay: 0.06, color: "#7dcfff", size: 4, smoke: false
+                            });
+                        }
+                        continue;
+                    }
+                    if (bb.x > -40 && bb.x < win.width + 40 && bb.y > 40 && bb.y < root.seaLevel)
+                        nextBossBullets.push(bb);
+                }
+                root.bossBullets = nextBossBullets;
+
+                // 3c. Player Level 3 Plasma Nose Laser beams fade
+                var nextBeams = [];
+                for (var lbi = 0; lbi < root.laserBeams.length; ++lbi) {
+                    var lb = root.laserBeams[lbi];
+                    lb.alpha -= 0.08;
+                    if (lb.alpha > 0.04)
+                        nextBeams.push(lb);
+                }
+                root.laserBeams = nextBeams;
 
                 // 4. Enemy Warships in the sea below
                 var nextShips = [];
@@ -469,11 +662,20 @@ ApplicationWindow {
                 }
                 root.paratroopers = nextTroopers;
 
-                // 7. Heavy Cruise Missiles update & collision
+                // 7. Heavy Cruise Missiles update & collision (with Level 2 & 3 target homing!)
                 var nextMissiles = [];
                 for (var mi = 0; mi < root.missiles.length; ++mi) {
                     var m = root.missiles[mi];
-                    m.vx = Math.min(13.5, m.vx + m.ax);
+                    m.vx = Math.min(14.5, m.vx + m.ax);
+
+                    // Upgraded Homing Guidance in Level 2 & Level 3 locks onto the Boss Aeroplane or nearest fighter!
+                    if (m.homing) {
+                        var targetY = root.bossActive ? root.bossY : m.y;
+                        var dyTarget = targetY - m.y;
+                        m.vy += Math.max(-0.35, Math.min(0.35, dyTarget * 0.012));
+                        m.vy = Math.max(-4.5, Math.min(4.5, m.vy));
+                    }
+
                     m.x += m.vx;
                     m.y += m.vy;
                     m.life--;
@@ -486,7 +688,7 @@ ApplicationWindow {
                         vy: (Math.random() - 0.5) * 0.6,
                         life: 0.85,
                         decay: 0.035,
-                        color: (Math.random() > 0.35) ? "#8892a8" : "#ff9e64",
+                        color: (Math.random() > 0.35) ? "#8892a8" : (m.homing ? "#7dcfff" : "#ff9e64"),
                         size: 5 + Math.random() * 3,
                         smoke: true
                     });
@@ -506,22 +708,18 @@ ApplicationWindow {
                         }
                     }
 
-                    // Hit check against giant mothership
+                    // Hit check against Boss Aeroplane
                     if (!missileHit && root.bossActive) {
-                        if (m.x > root.bossX - 90 && m.x < root.bossX + 90 &&
-                            m.y > root.bossY - 38 && m.y < root.bossY + 38) {
-                            root.bossHealth -= 14;
+                        var hitW = (backend.level === 3) ? 105 : 92;
+                        var hitH = (backend.level === 3) ? 46 : 40;
+                        if (m.x > root.bossX - hitW && m.x < root.bossX + hitW &&
+                            m.y > root.bossY - hitH && m.y < root.bossY + hitH) {
+                            var actualDmg = root.bossShieldActive ? Math.ceil((m.dmg || 16) * 0.45) : (m.dmg || 16);
+                            root.bossHealth -= actualDmg;
                             root.spawnDramaticExplosion(m.x, m.y, 1.35, false);
+                            backend.addScore(100);
                             missileHit = true;
-
-                            if (root.bossHealth <= 0) {
-                                root.bossActive = false;
-                                root.spawnDramaticExplosion(root.bossX, root.bossY, 2.4, false);
-                                root.spawnDramaticExplosion(root.bossX - 55, root.bossY + 12, 1.8, false);
-                                root.spawnDramaticExplosion(root.bossX + 55, root.bossY - 12, 1.8, false);
-                                backend.recordMothershipDefeated();
-                                root.addFloatingText("MOTHERSHIP OBLITERATED! 💥", root.bossX - 40, root.bossY, "#ff4d4d");
-                            }
+                            root.checkBossDefeated();
                         }
                     }
 
@@ -530,7 +728,7 @@ ApplicationWindow {
                 }
                 root.missiles = nextMissiles;
 
-                // 8. Gravity Bombs update & collision with Planes and Enemy Warships below!
+                // 8. Gravity Bombs update & collision with Boss, Planes, and Enemy Warships below!
                 var nextBombs = [];
                 for (var bi = 0; bi < root.bombs.length; ++bi) {
                     var bmb = root.bombs[bi];
@@ -542,16 +740,30 @@ ApplicationWindow {
 
                     var bombHit = false;
 
+                    // Bombs dropped from above can also strike the Boss Aeroplane!
+                    if (root.bossActive &&
+                        bmb.x > root.bossX - 90 && bmb.x < root.bossX + 90 &&
+                        bmb.y > root.bossY - 38 && bmb.y < root.bossY + 38) {
+                        root.bossHealth -= (bmb.dmg || 2) * 9;
+                        root.spawnDramaticExplosion(bmb.x, bmb.y, 1.45, false);
+                        backend.addScore(150);
+                        root.addFloatingText("BOMB HIT BOSS! +150", bmb.x, bmb.y - 16, "#ff9e64");
+                        bombHit = true;
+                        root.checkBossDefeated();
+                    }
+
                     // Bombs can hit enemy planes flying below the B-2 Spirit!
-                    for (var bpi = 0; bpi < root.smallPlanes.length; ++bpi) {
-                        var bpl = root.smallPlanes[bpi];
-                        if (Math.hypot(bmb.x - bpl.x, bmb.y - bpl.y) < 30) {
-                            root.spawnDramaticExplosion(bpl.x, bpl.y, 1.35, false);
-                            backend.recordPlaneDestroyed();
-                            root.addFloatingText("AIR BOMB HIT! +150", bpl.x, bpl.y - 12, "#ff9e64");
-                            root.smallPlanes.splice(bpi, 1);
-                            bombHit = true;
-                            break;
+                    if (!bombHit) {
+                        for (var bpi = 0; bpi < root.smallPlanes.length; ++bpi) {
+                            var bpl = root.smallPlanes[bpi];
+                            if (Math.hypot(bmb.x - bpl.x, bmb.y - bpl.y) < 30) {
+                                root.spawnDramaticExplosion(bpl.x, bpl.y, 1.35, false);
+                                backend.recordPlaneDestroyed();
+                                root.addFloatingText("AIR BOMB HIT! +150", bpl.x, bpl.y - 12, "#ff9e64");
+                                root.smallPlanes.splice(bpi, 1);
+                                bombHit = true;
+                                break;
+                            }
                         }
                     }
 
@@ -562,7 +774,7 @@ ApplicationWindow {
                             if (ship.sinking) continue;
                             if (bmb.x > ship.x - ship.w * 0.5 && bmb.x < ship.x + ship.w * 0.5 &&
                                 bmb.y >= root.seaLevel - ship.h && bmb.y <= root.seaLevel + 15) {
-                                ship.hp -= 2;
+                                ship.hp -= (bmb.dmg || 2);
                                 bombHit = true;
                                 if (ship.hp <= 0) {
                                     ship.sinking = true;
@@ -854,60 +1066,180 @@ ApplicationWindow {
                 }
                 ctx.globalAlpha = 1.0;
 
-                // 7. GIANT AIRBORNE CARRIER / MOTHERSHIP
+                // 7. BOSS AEROPLANE (LEVELS 1, 2, 3 DISTINCT ARCHITECTURES)
                 if (root.bossActive) {
                     ctx.save();
                     ctx.translate(root.bossX, root.bossY);
+                    var bLvl = backend.level;
 
-                    // Swept Heavy Wings
-                    ctx.fillStyle = "#252b3b";
-                    ctx.beginPath();
-                    ctx.moveTo(15, -6);
-                    ctx.lineTo(45, -58);
-                    ctx.lineTo(-22, -58);
-                    ctx.lineTo(-14, -6);
-                    ctx.closePath();
-                    ctx.fill();
+                    if (bLvl === 1) {
+                        // LEVEL 1 BOSS: IRON VULTURE BOMBER (Gunmetal Twin-Wing Heavy Carrier)
+                        ctx.fillStyle = "#252b3b";
+                        ctx.beginPath();
+                        ctx.moveTo(15, -6); ctx.lineTo(45, -58); ctx.lineTo(-22, -58); ctx.lineTo(-14, -6);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.moveTo(15, 6); ctx.lineTo(45, 52); ctx.lineTo(-22, 52); ctx.lineTo(-14, 6);
+                        ctx.closePath();
+                        ctx.fill();
 
-                    ctx.beginPath();
-                    ctx.moveTo(15, 6);
-                    ctx.lineTo(45, 52);
-                    ctx.lineTo(-22, 52);
-                    ctx.lineTo(-14, 6);
-                    ctx.closePath();
-                    ctx.fill();
+                        ctx.fillStyle = "#363e52";
+                        ctx.beginPath();
+                        ctx.ellipse(0, 0, 98, 28, 0, 0, 6.28);
+                        ctx.fill();
 
-                    // Heavy Fuselage
-                    ctx.fillStyle = "#363e52";
-                    ctx.beginPath();
-                    ctx.ellipse(0, 0, 98, 28, 0, 0, 6.28);
-                    ctx.fill();
+                        ctx.fillStyle = "#1a1e29";
+                        ctx.fillRect(12, -46, 32, 10);
+                        ctx.fillRect(12, 38, 32, 10);
+                        ctx.fillStyle = "#ff9e64";
+                        ctx.fillRect(44, -44, 10 + Math.random() * 7, 6);
+                        ctx.fillRect(44, 40, 10 + Math.random() * 7, 6);
 
-                    // 4 Heavy Turbine Nacelles + Afterburners
-                    ctx.fillStyle = "#1a1e29";
-                    ctx.fillRect(12, -46, 32, 10);
-                    ctx.fillRect(12, 38, 32, 10);
-                    ctx.fillStyle = "#ff9e64";
-                    ctx.fillRect(44, -44, 10 + Math.random() * 7, 6);
-                    ctx.fillRect(44, 40, 10 + Math.random() * 7, 6);
+                        ctx.fillStyle = "#7dcfff";
+                        ctx.beginPath();
+                        ctx.ellipse(-68, -5, 16, 7, -0.18, 0, 6.28);
+                        ctx.fill();
+                    } else if (bLvl === 2) {
+                        // LEVEL 2 BOSS: STORM VALKYRIE GUNSHIP (Crimson Forward-Swept Assault Fortress)
+                        ctx.fillStyle = "#5a1e2d";
+                        ctx.beginPath();
+                        ctx.moveTo(-25, -8); ctx.lineTo(-55, -72); ctx.lineTo(20, -64); ctx.lineTo(25, -8);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.moveTo(-25, 8); ctx.lineTo(-55, 72); ctx.lineTo(20, 64); ctx.lineTo(25, 8);
+                        ctx.closePath();
+                        ctx.fill();
 
-                    // Armored Cockpit Glass
-                    ctx.fillStyle = "#7dcfff";
-                    ctx.beginPath();
-                    ctx.ellipse(-68, -5, 16, 7, -0.18, 0, 6.28);
-                    ctx.fill();
+                        // Crimson Armored Fuselage
+                        ctx.fillStyle = "#7a283b";
+                        ctx.beginPath();
+                        ctx.ellipse(0, 0, 106, 32, 0, 0, 6.28);
+                        ctx.fill();
+
+                        // Forward Rotary Cannon Pods
+                        ctx.fillStyle = "#e0af68";
+                        ctx.fillRect(-95, -18, 22, 6);
+                        ctx.fillRect(-95, 12, 22, 6);
+
+                        // 4 Supersonic Afterburners
+                        ctx.fillStyle = "#ff4d4d";
+                        ctx.fillRect(22, -56, 16 + Math.random() * 9, 8);
+                        ctx.fillRect(22, 48, 16 + Math.random() * 9, 8);
+
+                        ctx.fillStyle = "#ffd60a";
+                        ctx.beginPath();
+                        ctx.ellipse(-72, -4, 18, 8, -0.12, 0, 6.28);
+                        ctx.fill();
+                    } else {
+                        // LEVEL 3 FINAL BOSS: SKY TITAN DREADNOUGHT (Obsidian & Gold Tri-Hull Aerial Super-Boss)
+                        ctx.fillStyle = "#1e1b2e";
+                        ctx.strokeStyle = "#bb9af7";
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(-40, 0);
+                        ctx.lineTo(35, -84);
+                        ctx.lineTo(80, -72);
+                        ctx.lineTo(48, 0);
+                        ctx.lineTo(80, 72);
+                        ctx.lineTo(35, 84);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.stroke();
+
+                        // Twin Outrigger Hulls
+                        ctx.fillStyle = "#2d2747";
+                        ctx.fillRect(-45, -62, 95, 16);
+                        ctx.fillRect(-45, 46, 95, 16);
+
+                        // Central Command Dreadnought Hull
+                        ctx.fillStyle = "#3b335e";
+                        ctx.beginPath();
+                        ctx.ellipse(0, 0, 114, 36, 0, 0, 6.28);
+                        ctx.fill();
+
+                        // Gold Armor Trim & Plasma Core
+                        ctx.strokeStyle = "#ffd60a";
+                        ctx.lineWidth = 2.2;
+                        ctx.beginPath();
+                        ctx.moveTo(-90, 0); ctx.lineTo(65, -24);
+                        ctx.moveTo(-90, 0); ctx.lineTo(65, 24);
+                        ctx.stroke();
+
+                        ctx.fillStyle = "#bb9af7";
+                        ctx.beginPath();
+                        ctx.arc(-25, 0, 14, 0, 6.28);
+                        ctx.fill();
+
+                        // 6 Violet Plasma Thrusters
+                        ctx.fillStyle = "#7dcfff";
+                        ctx.fillRect(52, -58, 18 + Math.random() * 10, 10);
+                        ctx.fillRect(52, 48, 18 + Math.random() * 10, 10);
+                        ctx.fillRect(108, -8, 22 + Math.random() * 12, 16);
+
+                        // Pulsing Energy Shield Dome
+                        if (root.bossShieldActive) {
+                            ctx.strokeStyle = "rgba(187, 154, 247, 0.85)";
+                            ctx.fillStyle = "rgba(125, 207, 255, 0.14)";
+                            ctx.lineWidth = 3.5;
+                            ctx.beginPath();
+                            ctx.ellipse(0, 0, 128, 92, 0, 0, 6.28);
+                            ctx.fill();
+                            ctx.stroke();
+                        }
+                    }
 
                     // Illuminated Drop Hangar Bay
                     ctx.fillStyle = root.bossHangarOpen ? "#ff9e64" : "#161922";
                     ctx.fillRect(46, -9, 26, 18);
 
-                    // Boss Health Bar
-                    ctx.fillStyle = "rgba(0,0,0,0.65)";
-                    ctx.fillRect(-65, -70, 130, 8);
-                    ctx.fillStyle = "#ff4d4d";
-                    var hpFrac = Math.max(0, root.bossHealth / root.bossMaxHealth);
-                    ctx.fillRect(-65, -70, 130 * hpFrac, 8);
+                    // Boss Name Tag & Health Bar above Boss Aeroplane
+                    ctx.font = "bold 12px sans-serif";
+                    ctx.fillStyle = "#ffd60a";
+                    ctx.fillText("LVL " + bLvl + " BOSS: " + backend.bossName.toUpperCase(), -78, -86);
 
+                    ctx.fillStyle = "rgba(0,0,0,0.75)";
+                    ctx.fillRect(-78, -80, 156, 9);
+                    ctx.fillStyle = root.bossShieldActive ? "#bb9af7" : "#ff4d4d";
+                    var hpFrac = Math.max(0, root.bossHealth / root.bossMaxHealth);
+                    ctx.fillRect(-78, -80, 156 * hpFrac, 9);
+
+                    ctx.restore();
+                }
+
+                // 7b. BOSS AEROPLANE CANNON / PLASMA ORBS
+                for (var bbi = 0; bbi < root.bossBullets.length; ++bbi) {
+                    var bb = root.bossBullets[bbi];
+                    ctx.save();
+                    ctx.fillStyle = bb.color;
+                    ctx.beginPath();
+                    ctx.arc(bb.x, bb.y, bb.radius, 0, 6.28);
+                    ctx.fill();
+                    ctx.fillStyle = "#ffffff";
+                    ctx.beginPath();
+                    ctx.arc(bb.x - 1.5, bb.y - 1.5, bb.radius * 0.45, 0, 6.28);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                // 7c. LEVEL 3 PLAYER PLASMA NOSE LASER BEAMS
+                for (var lbi = 0; lbi < root.laserBeams.length; ++lbi) {
+                    var lb = root.laserBeams[lbi];
+                    ctx.save();
+                    ctx.globalAlpha = Math.max(0, lb.alpha);
+                    ctx.strokeStyle = "#7dcfff";
+                    ctx.lineWidth = 8;
+                    ctx.beginPath();
+                    ctx.moveTo(lb.x1, lb.y1);
+                    ctx.lineTo(lb.x2, lb.y2);
+                    ctx.stroke();
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(lb.x1, lb.y1);
+                    ctx.lineTo(lb.x2, lb.y2);
+                    ctx.stroke();
                     ctx.restore();
                 }
 
@@ -1075,14 +1407,15 @@ ApplicationWindow {
                     ctx.restore();
                 }
 
-                // 12. REALISTIC B-2 SPIRIT STEALTH BOMBER (HERO PLANE)
+                // 12. REALISTIC B-2 SPIRIT STEALTH BOMBER (HERO PLANE WITH LEVEL 1/2/3 UPGRADES)
                 ctx.save();
                 ctx.translate(root.playerX, root.playerY);
                 ctx.rotate(root.playerTilt);
+                var pTier = backend.weaponTier;
 
-                // Concealed Dorsal Stealth Exhaust Glow (Twin recessed vents on top deck)
-                var jetGlow = 12 + Math.random() * 8;
-                ctx.fillStyle = "rgba(255, 158, 100, 0.85)";
+                // Concealed Dorsal Stealth Exhaust Glow (Twin recessed vents on top deck; Plasma Blue in Tier 3)
+                var jetGlow = 12 + pTier * 3 + Math.random() * 8;
+                ctx.fillStyle = (pTier === 3) ? "rgba(125, 207, 255, 0.9)" : "rgba(255, 158, 100, 0.85)";
                 ctx.beginPath();
                 ctx.moveTo(-22, -13); ctx.lineTo(-22 - jetGlow, -10); ctx.lineTo(-22, -7);
                 ctx.moveTo(-22, 7);   ctx.lineTo(-22 - jetGlow, 10);  ctx.lineTo(-22, 13);
@@ -1090,10 +1423,17 @@ ApplicationWindow {
 
                 // Open Internal Bomb Bay Glow when releasing missiles/bombs
                 if (root.bombBayOpenTicks > 0) {
-                    ctx.fillStyle = "rgba(255, 180, 90, 0.55)";
+                    ctx.fillStyle = (pTier === 3) ? "rgba(125, 207, 255, 0.65)" : "rgba(255, 180, 90, 0.55)";
                     ctx.beginPath();
                     ctx.ellipse(2, 8, 20, 9, 0, 0, 6.28);
                     ctx.fill();
+                }
+
+                // Level 2 & 3 Wingtip Supersonic Hardpoint Pods
+                if (pTier >= 2) {
+                    ctx.fillStyle = (pTier === 3) ? "#ffd60a" : "#ff9e64";
+                    ctx.fillRect(-16, -46, 22, 4);
+                    ctx.fillRect(-16, 42, 22, 4);
                 }
 
                 // B-2 Spirit Iconic Flying-Wing Silhouette with Sawtooth "W" Trailing Edge
@@ -1102,8 +1442,8 @@ ApplicationWindow {
                 b2Grad.addColorStop(0.45, "#373f4f");
                 b2Grad.addColorStop(1.0, "#232834");
                 ctx.fillStyle = b2Grad;
-                ctx.strokeStyle = "#7c8aa6";
-                ctx.lineWidth = 1.6;
+                ctx.strokeStyle = (pTier === 3) ? "#ffd60a" : (pTier === 2 ? "#7dcfff" : "#7c8aa6");
+                ctx.lineWidth = (pTier >= 2) ? 2.0 : 1.6;
 
                 ctx.beginPath();
                 ctx.moveTo(50, 0);      // Sharp stealth hawk-beak nose
@@ -1121,7 +1461,7 @@ ApplicationWindow {
                 ctx.stroke();
 
                 // Leading-edge radar-absorbent metallic sheen
-                ctx.strokeStyle = "#9ab0d6";
+                ctx.strokeStyle = (pTier === 3) ? "#7dcfff" : "#9ab0d6";
                 ctx.lineWidth = 1.8;
                 ctx.beginPath();
                 ctx.moveTo(-14, -62);
@@ -1140,6 +1480,14 @@ ApplicationWindow {
                 ctx.lineTo(4, 18);
                 ctx.closePath();
                 ctx.fill();
+
+                // Level 3 Nose Plasma Laser Emitter Core
+                if (pTier === 3) {
+                    ctx.fillStyle = "#7dcfff";
+                    ctx.beginPath();
+                    ctx.arc(46, 0, 4.5, 0, 6.28);
+                    ctx.fill();
+                }
 
                 // Radar-Absorbent Stealth Panel Seam Lines
                 ctx.strokeStyle = "rgba(175, 195, 225, 0.28)";
@@ -1170,7 +1518,7 @@ ApplicationWindow {
                 ctx.moveTo(23, 11);  ctx.lineTo(15, 15);  ctx.lineTo(16, 7);  ctx.closePath();
                 ctx.fill();
 
-                // Shield bubble when brushing past enemy planes
+                // Shield bubble when brushing past enemy planes or deflecting boss shots
                 if (root.invulnerableTicks > 0) {
                     ctx.strokeStyle = (root.invulnerableTicks % 4 < 2) ? "#7dcfff" : theme.accent;
                     ctx.lineWidth = 2.5;
@@ -1258,43 +1606,58 @@ ApplicationWindow {
 
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 18
-                anchors.rightMargin: 18
-                spacing: 14
+                anchors.leftMargin: 16
+                anchors.rightMargin: 16
+                spacing: 10
 
                 Label {
                     text: "B-2 " + qsTr("Sky Strike")
                     font.bold: true
-                    font.pixelSize: 20
+                    font.pixelSize: 19
                     color: theme.accent
                 }
 
                 Rectangle {
                     color: "#14ffffff"
                     radius: Math.min(4, theme.radius)
-                    implicitWidth: waveLabel.implicitWidth + 16
-                    implicitHeight: 32
+                    implicitWidth: waveLabel.implicitWidth + 14
+                    implicitHeight: 30
                     Label {
                         id: waveLabel
                         anchors.centerIn: parent
-                        text: qsTr("Wave %1").arg(backend.wave)
+                        text: qsTr("Level %1 / %2").arg(backend.level).arg(backend.maxLevels)
                         font.bold: true
                         font.pixelSize: 13
-                        color: "#c0caf5"
+                        color: "#7dcfff"
                     }
                 }
 
                 Rectangle {
                     color: "#14ffffff"
                     radius: Math.min(4, theme.radius)
-                    implicitWidth: scoreLabel.implicitWidth + 16
-                    implicitHeight: 32
+                    implicitWidth: tierLabel.implicitWidth + 14
+                    implicitHeight: 30
+                    Label {
+                        id: tierLabel
+                        anchors.centerIn: parent
+                        text: "⚡ " + qsTr("Tier %1").arg(backend.weaponTier)
+                        font.bold: true
+                        font.pixelSize: 13
+                        color: "#bb9af7"
+                    }
+                }
+
+                Rectangle {
+                    color: "#14ffffff"
+                    radius: Math.min(4, theme.radius)
+                    implicitWidth: scoreLabel.implicitWidth + 14
+                    implicitHeight: 30
                     Label {
                         id: scoreLabel
                         anchors.centerIn: parent
                         text: qsTr("Score: %1").arg(backend.score)
                         font.bold: true
-                        font.pixelSize: 14
+                        font.pixelSize: 13
                         color: "#ffd60a"
                     }
                 }
@@ -1302,8 +1665,8 @@ ApplicationWindow {
                 Rectangle {
                     color: "#14ffffff"
                     radius: Math.min(4, theme.radius)
-                    implicitWidth: shipsLabel.implicitWidth + 16
-                    implicitHeight: 32
+                    implicitWidth: shipsLabel.implicitWidth + 14
+                    implicitHeight: 30
                     Label {
                         id: shipsLabel
                         anchors.centerIn: parent
@@ -1317,8 +1680,8 @@ ApplicationWindow {
                 Rectangle {
                     color: "#14ffffff"
                     radius: Math.min(4, theme.radius)
-                    implicitWidth: rescueLabel.implicitWidth + 16
-                    implicitHeight: 32
+                    implicitWidth: rescueLabel.implicitWidth + 14
+                    implicitHeight: 30
                     Label {
                         id: rescueLabel
                         anchors.centerIn: parent
@@ -1329,18 +1692,18 @@ ApplicationWindow {
                     }
                 }
 
-                Item { Layout.fillWidth: true }
-
                 Label {
                     text: backend.statusMessage
                     font.bold: true
-                    font.pixelSize: 14
+                    font.pixelSize: 13
                     color: theme.accent
-                    visible: text.length > 0
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
                 }
 
                 Button {
-                    text: "🚀 " + qsTr("Fire Missile + Bomb")
+                    text: "🚀 " + qsTr("Fire")
                     font.bold: true
                     onClicked: root.fireAllOrdnance()
                 }
@@ -1355,6 +1718,98 @@ ApplicationWindow {
                     text: "?"
                     font.bold: true
                     onClicked: win.helpVisible = !win.helpVisible
+                }
+            }
+        }
+
+        // --- LEVEL INTRO BANNER (SHOWS BOSS AEROPLANE & WEAPON CAPABILITY) ---
+        Rectangle {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 84
+            width: 560
+            height: 76
+            color: "#d916161e"
+            border.color: theme.accent
+            border.width: 2
+            radius: theme.radius
+            visible: root.levelBannerTicks > 0 && !backend.victory && !win.helpVisible
+            opacity: Math.min(1.0, root.levelBannerTicks / 25.0)
+
+            ColumnLayout {
+                anchors.centerIn: parent
+                spacing: 4
+
+                Label {
+                    text: "🎯 " + qsTr("LEVEL %1 BOSS: %2").arg(backend.level).arg(backend.bossName)
+                    font.bold: true
+                    font.pixelSize: 18
+                    color: "#ffd60a"
+                    Layout.alignment: Qt.AlignHCenter
+                }
+
+                Label {
+                    text: "⚡ " + backend.weaponName
+                    font.bold: true
+                    font.pixelSize: 13
+                    color: "#7dcfff"
+                    Layout.alignment: Qt.AlignHCenter
+                }
+            }
+        }
+
+        // --- 3-LEVEL CAMPAIGN VICTORY OVERLAY ---
+        Rectangle {
+            anchors.centerIn: parent
+            width: 480
+            height: 310
+            color: "#f216161e"
+            border.color: "#ffd60a"
+            border.width: 3
+            radius: theme.radius
+            visible: backend.victory
+
+            ColumnLayout {
+                anchors.centerIn: parent
+                spacing: 14
+
+                Label {
+                    text: "🏆 " + qsTr("VICTORY! ALL 3 BOSSES DEFEATED!")
+                    font.bold: true
+                    font.pixelSize: 22
+                    color: "#ffd60a"
+                    Layout.alignment: Qt.AlignHCenter
+                }
+
+                Label {
+                    text: qsTr("Your B-2 Spirit destroyed Iron Vulture, Storm Valkyrie, and Sky Titan!")
+                    font.pixelSize: 13
+                    color: "#c0caf5"
+                    Layout.alignment: Qt.AlignHCenter
+                }
+
+                Label {
+                    text: qsTr("Final Score: %1").arg(backend.score)
+                    font.bold: true
+                    font.pixelSize: 20
+                    color: "#9ece6a"
+                    Layout.alignment: Qt.AlignHCenter
+                }
+
+                RowLayout {
+                    spacing: 18
+                    Layout.alignment: Qt.AlignHCenter
+                    Label { text: "✈️ " + qsTr("Bosses: %1").arg(backend.mothershipsDefeated); color: "#ff9e64"; font.bold: true }
+                    Label { text: "🚢 " + qsTr("Ships: %1").arg(backend.shipsDestroyed); color: "#7dcfff"; font.bold: true }
+                    Label { text: "🪂 " + qsTr("Rescued: %1").arg(backend.rescues); color: "#9ece6a"; font.bold: true }
+                }
+
+                Button {
+                    text: "🚀 " + qsTr("Play 3-Level Campaign Again")
+                    Material.background: theme.accent
+                    Material.foreground: theme.accentForeground
+                    font.bold: true
+                    Layout.alignment: Qt.AlignHCenter
+                    onClicked: backend.resetGame()
                 }
             }
         }
@@ -1459,7 +1914,19 @@ ApplicationWindow {
                     }
 
                     Label {
-                        text: "⌨️ Shortcuts: [Space] Missile+Bomb | [B] Carpet Bomb | [P] Pause | [?] Help | [Q] Quit"
+                        text: "🎯 " + qsTr("3 Boss Aeroplane Levels: Defeat the Boss to advance & upgrade weapons!")
+                        font.pixelSize: 14
+                        color: "#bb9af7"
+                    }
+
+                    Label {
+                        text: "⚡ " + qsTr("Lvl 1: Heavy Missile | Lvl 2: Twin Homing Missiles | Lvl 3: Triple Missiles + Laser!")
+                        font.pixelSize: 13
+                        color: "#7dcfff"
+                    }
+
+                    Label {
+                        text: "⌨️ Shortcuts: [Space] Fire | [B] Carpet Bomb | [1/2/3] Jump Level | [P] Pause | [?] Help | [Q] Quit"
                         font.pixelSize: 12
                         color: "#565f89"
                     }
