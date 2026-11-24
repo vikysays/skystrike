@@ -45,6 +45,7 @@ private slots:
         QCOMPARE(backend.maxLevels(), 3);
         QCOMPARE(backend.weaponTier(), 1);
         QCOMPARE(backend.bossName(), QString("Iron Vulture Bomber"));
+        QCOMPARE(backend.theaterName(), QString("Coral Sea Sunset Archipelago"));
         QCOMPARE(backend.victory(), false);
 
         // Defeating Level 1 Boss advances to Level 2 & unlocks Tier 2 weapons
@@ -53,6 +54,7 @@ private slots:
         QCOMPARE(backend.level(), 2);
         QCOMPARE(backend.weaponTier(), 2);
         QCOMPARE(backend.bossName(), QString("Storm Valkyrie Gunship"));
+        QCOMPARE(backend.theaterName(), QString("Arctic Aurora Glacier Strait"));
         QCOMPARE(backend.victory(), false);
         QVERIFY(backend.score() >= 2500);
 
@@ -62,6 +64,7 @@ private slots:
         QCOMPARE(backend.level(), 3);
         QCOMPARE(backend.weaponTier(), 3);
         QCOMPARE(backend.bossName(), QString("Sky Titan Dreadnought"));
+        QCOMPARE(backend.theaterName(), QString("Volcanic Lightning Red Sea"));
         QCOMPARE(backend.victory(), false);
 
         // Defeating Level 3 Final Boss completes the 3-level campaign with victory!

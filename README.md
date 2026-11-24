@@ -8,14 +8,14 @@ B-2 Spirit stealth bomber air and naval combat game for Omarchy, designed for ef
 
 - **B-2 Spirit Stealth Bomber**: Fly the iconic flying-wing stealth bomber with sawtooth trailing edge, flush cockpit windows, and internal bomb bay doors.
 - **Big Cruise Missiles & Dramatic Impact**: Launch heavy cruise missiles with roaring afterburner plumes, supersonic shockwave rings, multi-stage fireballs, dark smoke clouds, and screen shake.
-- **3 Boss Aeroplane Levels with Progressive Complexity**:
-  - **Level 1 — Iron Vulture Bomber**: Gunmetal twin-wing airborne carrier launching red fighter escorts and firing targeted plasma shots.
-  - **Level 2 — Storm Valkyrie Gunship**: Crimson forward-swept assault fortress with agile swooping maneuvers, twin fighter launches, and 3-way cannon spreads.
-  - **Level 3 — Sky Titan Dreadnought**: Obsidian-and-gold tri-hull aerial dreadnought with a pulsing energy shield dome, 5-way plasma spreads, and full air/naval armada support.
-- **Upgraded Player B-2 Spirit Capabilities Per Level**:
-  - **Level 1 (Tier 1 Weapons)**: Heavy Cruise Missile + Gravity Bomb + 4-Bomb Carpet Salvo.
-  - **Level 2 (Tier 2 Weapons)**: Twin Supersonic Homing Missiles + Dual Cluster Bombs + 6-Bomb Carpet Salvo.
-  - **Level 3 (Tier 3 Weapons)**: Triple Homing Cruise Missiles + High-Energy Nose Plasma Laser Beam + 3 Heavy Bombs + 8-Bomb Mega Carpet Salvo.
+- **3 Distinct Combat Theaters & Multi-Phase Boss Aeroplanes**:
+  - **Level 1 — Coral Sea Sunset Archipelago (`380 HP` Iron Vulture Bomber)**: Golden-crimson sunset sky over tropical volcanic islands and turquoise swells. The gunmetal twin-wing carrier enters **Phase 2 Enraged Overdrive** at 50% HP with faster maneuvers and double fighter launches.
+  - **Level 2 — Arctic Aurora Glacier Strait (`720 HP` Storm Valkyrie Gunship)**: Polar midnight sky with shimmering emerald and cyan Aurora Borealis ribbons and towering jagged glaciers. The crimson forward-swept assault fortress unleashes 3-way cannon spreads and activates a Phase 2 tactical energy shield below 50% HP.
+  - **Level 3 — Volcanic Lightning Red Sea (`1150 HP` Sky Titan Dreadnought)**: Obsidian ash clouds, erupting twin volcanoes with glowing magma streams, crimson sea swells, and storm lightning bolts. The tri-hull dreadnought commands a pulsing energy shield dome, 5-way plasma spreads, and Phase 2 overdrive.
+- **Incremental B-2 Spirit Offensive Capabilities Per Level**:
+  - **Level 1 (Tier 1 Weapons)**: `1` Heavy Cruise Missile + Continuous **Nose Rotary Gatling Cannon** (`+150` gun kills) + `1` Gravity Bomb + `4`-Bomb Carpet Salvo.
+  - **Level 2 (Tier 2 Weapons)**: **Twin Supersonic Homing Missiles** + **Twin Wing-Mounted Cyan Rotary Autocannons** + **Dual Cluster Bombs** + `6`-Bomb Carpet Salvo.
+  - **Level 3 (Tier 3 Weapons)**: **Triple Homing Cruise Missiles** + **High-Energy Nose Plasma Laser Beam** + **Twin Autonomous Stealth Wingman Drones** firing violet plasma bolts + `3` Heavy Mega Bombs + `8`-Bomb Mega Carpet Salvo.
 - **Wartime Seascape & Paratrooper Rescues**: Dynamic rolling ocean swells, whitecap waves, searchlight beams, water splash geysers, enemy destroyers/cruisers/carriers that catch fire and sink, and paratroopers to rescue mid-air.
 
 ## Keyboard and Mouse Controls

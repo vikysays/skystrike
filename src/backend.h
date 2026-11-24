@@ -17,6 +17,7 @@ class Backend : public QObject {
     Q_PROPERTY(int weaponTier READ weaponTier NOTIFY weaponTierChanged)
     Q_PROPERTY(QString weaponName READ weaponName NOTIFY weaponTierChanged)
     Q_PROPERTY(QString bossName READ bossName NOTIFY levelChanged)
+    Q_PROPERTY(QString theaterName READ theaterName NOTIFY levelChanged)
     Q_PROPERTY(bool victory READ victory NOTIFY victoryChanged)
     Q_PROPERTY(bool paused READ paused NOTIFY pausedChanged)
     Q_PROPERTY(int fireTrigger READ fireTrigger NOTIFY fireTriggerChanged)
@@ -38,6 +39,7 @@ public:
     int weaponTier() const { return m_wave; }
     QString weaponName() const;
     QString bossName() const;
+    QString theaterName() const;
     bool victory() const { return m_victory; }
     bool paused() const { return m_paused; }
     int fireTrigger() const { return m_fireTrigger; }

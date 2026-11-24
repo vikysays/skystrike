@@ -62,14 +62,17 @@ ApplicationWindow {
         property real bossY: 170
         property real bossVx: -1.1
         property real bossVy: 0.6
-        property real bossHealth: 160
-        property real bossMaxHealth: 160
+        property real bossHealth: 360
+        property real bossMaxHealth: 360
         property bool bossHangarOpen: false
+        property bool bossEnraged: false
         property int bossSpawnTimer: 0
         property int bossFireTimer: 0
         property bool bossActive: true
         property bool bossShieldActive: false
         property int levelTransitionTicks: 0
+        property int autoCannonTimer: 0
+        property int lightningFlashTicks: 0
 
         // --- DYNAMIC ENTITIES ---
         property var smallPlanes: []
@@ -77,6 +80,7 @@ ApplicationWindow {
         property var paratroopers: []
         property var missiles: []
         property var bombs: []
+        property var cannonBolts: []
         property var laserBeams: []
         property var bossBullets: []
         property var particles: []
@@ -87,10 +91,11 @@ ApplicationWindow {
 
         readonly property real seaLevel: win.height - 105
 
+        // Substantial multi-phase boss endurance so each level is a proper boss battle
         function bossMaxHpForLevel(lvl) {
-            if (lvl === 1) return 150;
-            if (lvl === 2) return 280;
-            return 440;
+            if (lvl === 1) return 380;
+            if (lvl === 2) return 720;
+            return 1150;
         }
 
         function setupLevel(lvl) {
@@ -102,12 +107,14 @@ ApplicationWindow {
             bossMaxHealth = bossMaxHpForLevel(lvl);
             bossHealth = bossMaxHealth;
             bossHangarOpen = false;
+            bossEnraged = false;
             bossSpawnTimer = 0;
             bossFireTimer = 0;
             bossShieldActive = false;
             levelTransitionTicks = 0;
-            levelBannerTicks = 170;
+            levelBannerTicks = 190;
             bossBullets = [];
+            cannonBolts = [];
             laserBeams = [];
 
             // Enemy warships on the sea scaled by level complexity
@@ -277,34 +284,46 @@ ApplicationWindow {
             });
         }
 
-        // Fires player ordnance scaled by Level / Weapon Tier (1, 2, 3)!
+        // Fires incremental B-2 Spirit offensive capabilities scaled by Level / Weapon Tier (1, 2, 3)!
         function fireAllOrdnance() {
             if (backend.paused || backend.victory) return;
             root.bombBayOpenTicks = 24;
             var tier = backend.weaponTier;
 
             if (tier === 1) {
-                // LEVEL 1 (TIER 1): 1 Heavy Cruise Missile + 1 Heavy Gravity Bomb
+                // LEVEL 1 (TIER 1): 1 Heavy Cruise Missile + Nose Rotary Gatling Burst + 1 Heavy Gravity Bomb
                 missiles.push({
                     x: playerX + 26, y: playerY + 4,
                     vx: 5.8, ax: 0.35, vy: 0,
-                    homing: false, dmg: 16, life: 145
+                    homing: false, dmg: 15, life: 145
+                });
+                cannonBolts.push({
+                    x: playerX + 50, y: playerY,
+                    vx: 14.5, vy: 0, dmg: 4, color: "#ffd60a", life: 75
                 });
                 bombs.push({
                     x: playerX - 4, y: playerY + 14,
                     vx: 2.2, vy: 1.8, gravity: 0.22, angle: 0.4, dmg: 2, life: 200
                 });
             } else if (tier === 2) {
-                // LEVEL 2 (TIER 2): Twin Supersonic Cruise Missiles + Dual Cluster Bombs
+                // LEVEL 2 (TIER 2): Twin Supersonic Homing Missiles + Twin Wing Rotary Autocannons + Dual Cluster Bombs
                 missiles.push({
                     x: playerX + 24, y: playerY - 12,
                     vx: 6.5, ax: 0.40, vy: -0.35,
-                    homing: true, dmg: 18, life: 150
+                    homing: true, dmg: 16, life: 150
                 });
                 missiles.push({
                     x: playerX + 24, y: playerY + 14,
                     vx: 6.5, ax: 0.40, vy: 0.35,
-                    homing: true, dmg: 18, life: 150
+                    homing: true, dmg: 16, life: 150
+                });
+                cannonBolts.push({
+                    x: playerX + 12, y: playerY - 42,
+                    vx: 15.5, vy: -0.25, dmg: 5, color: "#7dcfff", life: 80
+                });
+                cannonBolts.push({
+                    x: playerX + 12, y: playerY + 42,
+                    vx: 15.5, vy: 0.25, dmg: 5, color: "#7dcfff", life: 80
                 });
                 bombs.push({
                     x: playerX - 8, y: playerY + 14,
@@ -315,14 +334,24 @@ ApplicationWindow {
                     vx: 2.7, vy: 1.9, gravity: 0.23, angle: 0.4, dmg: 2, life: 200
                 });
             } else {
-                // LEVEL 3 (TIER 3): Triple Homing Missiles + Plasma Nose Laser Beam + 3 Heavy Bombs!
+                // LEVEL 3 (TIER 3): Triple Homing Missiles + Plasma Nose Laser Beam + Twin Wingman Stealth Drones + 3 Mega Bombs!
                 for (var mIdx = -1; mIdx <= 1; ++mIdx) {
                     missiles.push({
                         x: playerX + 26, y: playerY + mIdx * 13,
                         vx: 7.2, ax: 0.45, vy: mIdx * 0.9,
-                        homing: true, dmg: 20, life: 160
+                        homing: true, dmg: 18, life: 160
                     });
                 }
+                // Wingman Drone Plasma Bolts
+                var droneOffset = Math.sin(root.seaTime * 2.2) * 8;
+                cannonBolts.push({
+                    x: playerX - 18, y: playerY - 74 + droneOffset,
+                    vx: 16.5, vy: 0, dmg: 7, color: "#bb9af7", life: 85
+                });
+                cannonBolts.push({
+                    x: playerX - 18, y: playerY + 74 - droneOffset,
+                    vx: 16.5, vy: 0, dmg: 7, color: "#bb9af7", life: 85
+                });
                 for (var bIdx = 0; bIdx < 3; ++bIdx) {
                     bombs.push({
                         x: playerX - 12 + bIdx * 12, y: playerY + 14 + bIdx * 3,
@@ -439,6 +468,44 @@ ApplicationWindow {
                     root.invulnerableTicks--;
                 if (root.levelBannerTicks > 0)
                     root.levelBannerTicks--;
+                if (root.lightningFlashTicks > 0)
+                    root.lightningFlashTicks--;
+
+                // Continuous automatic nose/wing/drone gunfire so the B-2 Spirit feels progressively deadlier each level!
+                root.autoCannonTimer++;
+                var pTierLoop = backend.weaponTier;
+                var autoInterval = (pTierLoop === 1) ? 28 : (pTierLoop === 2 ? 20 : 15);
+                if (!backend.victory && root.autoCannonTimer % autoInterval === 0) {
+                    if (pTierLoop === 1) {
+                        root.cannonBolts.push({
+                            x: root.playerX + 50, y: root.playerY,
+                            vx: 14.0, vy: 0, dmg: 3, color: "#ffd60a", life: 70
+                        });
+                    } else if (pTierLoop === 2) {
+                        root.cannonBolts.push({
+                            x: root.playerX + 12, y: root.playerY - 42,
+                            vx: 15.0, vy: -0.15, dmg: 4, color: "#7dcfff", life: 75
+                        });
+                        root.cannonBolts.push({
+                            x: root.playerX + 12, y: root.playerY + 42,
+                            vx: 15.0, vy: 0.15, dmg: 4, color: "#7dcfff", life: 75
+                        });
+                    } else {
+                        var dOff = Math.sin(root.seaTime * 2.2) * 8;
+                        root.cannonBolts.push({
+                            x: root.playerX + 50, y: root.playerY,
+                            vx: 16.0, vy: 0, dmg: 5, color: "#ffd60a", life: 80
+                        });
+                        root.cannonBolts.push({
+                            x: root.playerX - 18, y: root.playerY - 74 + dOff,
+                            vx: 16.0, vy: -0.1, dmg: 5, color: "#bb9af7", life: 80
+                        });
+                        root.cannonBolts.push({
+                            x: root.playerX - 18, y: root.playerY + 74 - dOff,
+                            vx: 16.0, vy: 0.1, dmg: 5, color: "#bb9af7", life: 80
+                        });
+                    }
+                }
 
                 // 1. B-2 Spirit smooth flight clamped between HUD and sea level
                 var clampedTargetX = Math.max(65, Math.min(win.width - 65, root.targetX));
@@ -457,20 +524,47 @@ ApplicationWindow {
                         root.clouds[cli].x = win.width + 80;
                 }
 
-                // 3. Boss Aeroplane logic across 3 complexity levels
+                // 3. Multi-Phase Boss Aeroplane logic across 3 complexity levels
                 var lvl = backend.level;
                 if (root.bossActive) {
-                    root.bossX += root.bossVx;
+                    // Check Phase 2 Enraged Overdrive below 50% HP!
+                    if (!root.bossEnraged && root.bossHealth <= root.bossMaxHealth * 0.5) {
+                        root.bossEnraged = true;
+                        root.spawnDramaticExplosion(root.bossX, root.bossY, 1.8, false);
+                        root.addFloatingText("⚠️ BOSS ENRAGED! PHASE 2 OVERDRIVE!", root.bossX - 110, root.bossY - 50, "#ff4d4d");
+                        backend.setStatusMessage("PHASE 2: " + backend.bossName.toUpperCase() + " ENRAGED!");
+                    }
+
+                    // Damaged boss emits heavy war smoke and sparks in Phase 2
+                    if (root.bossEnraged && Math.random() < 0.45) {
+                        root.particles.push({
+                            x: root.bossX + (Math.random() - 0.5) * 90,
+                            y: root.bossY + (Math.random() - 0.5) * 30,
+                            vx: -1.2,
+                            vy: -(0.8 + Math.random() * 1.4),
+                            life: 0.9,
+                            decay: 0.025,
+                            color: (Math.random() > 0.35) ? "#222630" : "#ff4d4d",
+                            size: 8 + Math.random() * 6,
+                            smoke: true
+                        });
+                    }
+
+                    var rageMult = root.bossEnraged ? 1.35 : 1.0;
+                    root.bossX += root.bossVx * rageMult;
                     if (lvl === 1) {
-                        // Level 1 Boss: Iron Vulture Bomber (steady upper patrol)
-                        root.bossY = 165 + Math.sin(root.seaTime * 0.7) * 26;
+                        // Level 1 Boss: Iron Vulture Bomber (Coral Sea patrol)
+                        root.bossY = 170 + Math.sin(root.seaTime * 0.75 * rageMult) * (root.bossEnraged ? 55 : 28);
                     } else if (lvl === 2) {
-                        // Level 2 Boss: Storm Valkyrie Gunship (agile swooping flight across mid-sky)
-                        root.bossY = 215 + Math.sin(root.seaTime * 1.15) * 85;
+                        // Level 2 Boss: Storm Valkyrie Gunship (Arctic swooping flight + tactical shield in Phase 2)
+                        root.bossY = 215 + Math.sin(root.seaTime * 1.15 * rageMult) * 95;
+                        root.bossShieldActive = root.bossEnraged && (Math.floor(root.seaTime * 1.1) % 5 === 4);
                     } else {
-                        // Level 3 Boss: Sky Titan Dreadnought (aggressive figure-8 aerial dominance + energy shield pulses)
-                        root.bossY = 235 + Math.sin(root.seaTime * 1.35) * 115;
-                        root.bossShieldActive = (Math.floor(root.seaTime * 1.2) % 4 === 3);
+                        // Level 3 Boss: Sky Titan Dreadnought (Volcanic Red Sea aerial dominance + energy shield pulses)
+                        root.bossY = 235 + Math.sin(root.seaTime * 1.35 * rageMult) * 115;
+                        root.bossShieldActive = (Math.floor(root.seaTime * 1.25) % 4 === 3);
+                        if (Math.random() < 0.008)
+                            root.lightningFlashTicks = 8;
                     }
 
                     var minBossX = (lvl === 3) ? win.width * 0.42 : win.width * 0.48;
@@ -482,11 +576,11 @@ ApplicationWindow {
 
                     // Boss launches fighter escorts & paratroopers
                     root.bossSpawnTimer++;
-                    var spawnInterval = Math.max(48, 95 - lvl * 15);
+                    var spawnInterval = Math.max(38, (root.bossEnraged ? 72 : 95) - lvl * 14);
                     if (root.bossSpawnTimer % spawnInterval === 0) {
                         root.bossHangarOpen = true;
                         root.spawnSmallPlane(root.bossX - 24, root.bossY + 24);
-                        if (lvl >= 2)
+                        if (lvl >= 2 || root.bossEnraged)
                             root.spawnSmallPlane(root.bossX - 10, root.bossY - 22);
                         if (Math.random() > 0.30) {
                             root.spawnParatrooper(root.bossX + 25, root.bossY + 28);
@@ -497,9 +591,10 @@ ApplicationWindow {
                         root.bossHangarOpen = false;
                     }
 
-                    // Boss fires aerial plasma/cannon spreads based on level complexity
+                    // Boss fires aerial plasma/cannon spreads based on level complexity & Phase 2 rage
                     root.bossFireTimer++;
-                    var fireInterval = (lvl === 1) ? 95 : (lvl === 2 ? 70 : 52);
+                    var baseFire = (lvl === 1) ? 90 : (lvl === 2 ? 68 : 50);
+                    var fireInterval = root.bossEnraged ? Math.floor(baseFire * 0.72) : baseFire;
                     if (root.bossFireTimer % fireInterval === 0) {
                         root.fireBossSpread(lvl);
                     }
@@ -512,6 +607,48 @@ ApplicationWindow {
                         }
                     }
                 }
+
+                // 3a. Player Autocannon / Wingman Drone Bolts update & hit checks
+                var nextBolts = [];
+                for (var cbi = 0; cbi < root.cannonBolts.length; ++cbi) {
+                    var cb = root.cannonBolts[cbi];
+                    cb.x += cb.vx;
+                    cb.y += cb.vy;
+                    cb.life--;
+                    var boltHit = false;
+
+                    for (var cpi = 0; cpi < root.smallPlanes.length; ++cpi) {
+                        var cpl = root.smallPlanes[cpi];
+                        if (Math.hypot(cb.x - cpl.x, cb.y - cpl.y) < 24) {
+                            root.spawnDramaticExplosion(cpl.x, cpl.y, 1.0, false);
+                            backend.recordPlaneDestroyed();
+                            root.addFloatingText("GUN KILL! +150", cpl.x, cpl.y - 12, cb.color);
+                            root.smallPlanes.splice(cpi, 1);
+                            boltHit = true;
+                            break;
+                        }
+                    }
+
+                    if (!boltHit && root.bossActive) {
+                        if (cb.x > root.bossX - 95 && cb.x < root.bossX + 95 &&
+                            cb.y > root.bossY - 42 && cb.y < root.bossY + 42) {
+                            var bDmg = root.bossShieldActive ? Math.ceil(cb.dmg * 0.4) : cb.dmg;
+                            root.bossHealth -= bDmg;
+                            root.particles.push({
+                                x: cb.x, y: cb.y,
+                                vx: -2, vy: (Math.random() - 0.5) * 3,
+                                life: 0.7, decay: 0.08, color: cb.color, size: 4.5, smoke: false
+                            });
+                            backend.addScore(25);
+                            boltHit = true;
+                            root.checkBossDefeated();
+                        }
+                    }
+
+                    if (!boltHit && cb.x < win.width + 40 && cb.life > 0)
+                        nextBolts.push(cb);
+                }
+                root.cannonBolts = nextBolts;
 
                 // 3b. Boss Aeroplane cannon/plasma projectiles update
                 var nextBossBullets = [];
@@ -877,26 +1014,143 @@ ApplicationWindow {
                     ctx.translate(sx, sy);
                 }
 
-                // 1. WARTIME STORMY SKY GRADIENT
+                var envLvl = backend.level;
+
+                // 1. DISTINCT LEVEL THEATER SKY & HORIZON SCENERY (LEVELS 1, 2, 3)
                 var skyGrad = ctx.createLinearGradient(0, 0, 0, root.seaLevel);
-                skyGrad.addColorStop(0.0, "#080b12");
-                skyGrad.addColorStop(0.45, "#121a2a");
-                skyGrad.addColorStop(0.80, "#1d2b44");
-                skyGrad.addColorStop(1.0, "#2b3a55");
+                if (envLvl === 1) {
+                    // LEVEL 1: CORAL SEA SUNSET ARCHIPELAGO (Golden-Crimson Sunset & Tropical Volcanic Islands)
+                    skyGrad.addColorStop(0.0, "#120c24");
+                    skyGrad.addColorStop(0.42, "#3b1d4a");
+                    skyGrad.addColorStop(0.75, "#873348");
+                    skyGrad.addColorStop(1.0, "#d96b43");
+                } else if (envLvl === 2) {
+                    // LEVEL 2: ARCTIC AURORA GLACIER STRAIT (Deep Polar Midnight & Emerald Borealis Sky)
+                    skyGrad.addColorStop(0.0, "#040b18");
+                    skyGrad.addColorStop(0.45, "#091d36");
+                    skyGrad.addColorStop(0.80, "#113758");
+                    skyGrad.addColorStop(1.0, "#1d587a");
+                } else {
+                    // LEVEL 3: VOLCANIC LIGHTNING RED SEA (Obsidian-Ash Storm Sky & Magma Horizon)
+                    skyGrad.addColorStop(0.0, "#09060c");
+                    skyGrad.addColorStop(0.45, "#1f0d1d");
+                    skyGrad.addColorStop(0.80, "#471222");
+                    skyGrad.addColorStop(1.0, "#7a1c1c");
+                }
                 ctx.fillStyle = skyGrad;
                 ctx.fillRect(0, 0, width, root.seaLevel);
 
-                // Distant wartime horizon glow (artillery / burning fleet glow on horizon)
-                var horizonGlow = ctx.createRadialGradient(width * 0.65, root.seaLevel, 10, width * 0.65, root.seaLevel, 380);
-                horizonGlow.addColorStop(0.0, "rgba(255, 110, 50, 0.22)");
-                horizonGlow.addColorStop(0.5, "rgba(247, 118, 142, 0.08)");
-                horizonGlow.addColorStop(1.0, "rgba(0, 0, 0, 0)");
-                ctx.fillStyle = horizonGlow;
-                ctx.fillRect(0, root.seaLevel - 320, width, 320);
+                // Level-Specific Atmospheric & Horizon Landmarks
+                if (envLvl === 1) {
+                    // Glowing Golden Setting Sun on the Coral Sea Horizon
+                    var sunGrad = ctx.createRadialGradient(width * 0.72, root.seaLevel - 35, 12, width * 0.72, root.seaLevel - 35, 195);
+                    sunGrad.addColorStop(0.0, "rgba(255, 225, 120, 0.85)");
+                    sunGrad.addColorStop(0.35, "rgba(255, 135, 65, 0.40)");
+                    sunGrad.addColorStop(1.0, "rgba(255, 90, 50, 0)");
+                    ctx.fillStyle = sunGrad;
+                    ctx.fillRect(0, root.seaLevel - 260, width, 260);
+
+                    // Distant Tropical Archipelago Islands & Radar Tower Silhouette
+                    ctx.fillStyle = "#22152e";
+                    ctx.beginPath();
+                    ctx.moveTo(70, root.seaLevel);
+                    ctx.lineTo(145, root.seaLevel - 68);
+                    ctx.lineTo(225, root.seaLevel - 42);
+                    ctx.lineTo(310, root.seaLevel);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.moveTo(width * 0.54, root.seaLevel);
+                    ctx.lineTo(width * 0.61, root.seaLevel - 92);
+                    ctx.lineTo(width * 0.67, root.seaLevel - 55);
+                    ctx.lineTo(width * 0.74, root.seaLevel - 82);
+                    ctx.lineTo(width * 0.84, root.seaLevel);
+                    ctx.closePath();
+                    ctx.fill();
+                } else if (envLvl === 2) {
+                    // Shimmering Emerald & Cyan Aurora Borealis Ribbons in the Upper Sky
+                    ctx.save();
+                    for (var ab = 0; ab < 2; ++ab) {
+                        ctx.strokeStyle = (ab === 0) ? "rgba(158, 206, 106, 0.22)" : "rgba(125, 207, 255, 0.18)";
+                        ctx.lineWidth = 34 - ab * 10;
+                        ctx.beginPath();
+                        for (var ax = 0; ax <= width; ax += 45) {
+                            var ay = 135 + ab * 38 + Math.sin(ax * 0.008 + root.seaTime * 0.7 + ab) * 28;
+                            if (ax === 0) ctx.moveTo(ax, ay);
+                            else ctx.lineTo(ax, ay);
+                        }
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+
+                    // Towering Jagged Polar Glaciers & Icebergs on the Horizon
+                    ctx.fillStyle = "#183e5c";
+                    ctx.beginPath();
+                    ctx.moveTo(90, root.seaLevel);
+                    ctx.lineTo(135, root.seaLevel - 108);
+                    ctx.lineTo(175, root.seaLevel - 72);
+                    ctx.lineTo(220, root.seaLevel - 122);
+                    ctx.lineTo(295, root.seaLevel);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.fillStyle = "#2b648c";
+                    ctx.beginPath();
+                    ctx.moveTo(width * 0.62, root.seaLevel);
+                    ctx.lineTo(width * 0.68, root.seaLevel - 130);
+                    ctx.lineTo(width * 0.73, root.seaLevel - 85);
+                    ctx.lineTo(width * 0.79, root.seaLevel - 115);
+                    ctx.lineTo(width * 0.87, root.seaLevel);
+                    ctx.closePath();
+                    ctx.fill();
+                } else {
+                    // Level 3: Erupting Volcanic Cones, Magma Rivers & Crimson Lightning Flashes
+                    var magmaGlow = ctx.createRadialGradient(width * 0.68, root.seaLevel, 15, width * 0.68, root.seaLevel, 420);
+                    magmaGlow.addColorStop(0.0, "rgba(255, 77, 77, 0.45)");
+                    magmaGlow.addColorStop(0.5, "rgba(255, 158, 100, 0.16)");
+                    magmaGlow.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+                    ctx.fillStyle = magmaGlow;
+                    ctx.fillRect(0, root.seaLevel - 350, width, 350);
+
+                    // Twin Erupting Volcanoes on the Horizon
+                    ctx.fillStyle = "#1a0a12";
+                    ctx.beginPath();
+                    ctx.moveTo(width * 0.52, root.seaLevel);
+                    ctx.lineTo(width * 0.64, root.seaLevel - 138);
+                    ctx.lineTo(width * 0.70, root.seaLevel - 138);
+                    ctx.lineTo(width * 0.83, root.seaLevel);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Glowing Lava Crater & Magma Streams
+                    ctx.strokeStyle = "#ff4d4d";
+                    ctx.lineWidth = 3.5;
+                    ctx.beginPath();
+                    ctx.moveTo(width * 0.65, root.seaLevel - 136);
+                    ctx.lineTo(width * 0.63, root.seaLevel - 65);
+                    ctx.moveTo(width * 0.68, root.seaLevel - 136);
+                    ctx.lineTo(width * 0.72, root.seaLevel - 50);
+                    ctx.stroke();
+
+                    // Periodic Red-Violet Storm Lightning Bolt in Level 3
+                    if (root.lightningFlashTicks > 0) {
+                        ctx.fillStyle = "rgba(255, 200, 220, 0.14)";
+                        ctx.fillRect(0, 0, width, root.seaLevel);
+                        ctx.strokeStyle = "#ffd60a";
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.moveTo(width * 0.45, 64);
+                        ctx.lineTo(width * 0.42, 165);
+                        ctx.lineTo(width * 0.47, 185);
+                        ctx.lineTo(width * 0.41, 310);
+                        ctx.stroke();
+                    }
+                }
 
                 // Searchlight beams sweeping from distant naval horizon
                 ctx.save();
-                ctx.fillStyle = "rgba(180, 210, 255, 0.04)";
+                ctx.fillStyle = (envLvl === 3) ? "rgba(255, 120, 120, 0.05)" : (envLvl === 2 ? "rgba(125, 240, 255, 0.05)" : "rgba(255, 220, 160, 0.05)");
                 for (var sbi = 0; sbi < 2; ++sbi) {
                     var bx = width * (0.3 + sbi * 0.45);
                     var swing = Math.sin(root.seaTime * 0.5 + sbi * 2.1) * 180;
@@ -909,10 +1163,15 @@ ApplicationWindow {
                 }
                 ctx.restore();
 
-                // 2. STORM CLOUDS
+                // 2. STORM CLOUDS TINTED BY LEVEL THEATER
                 for (var ci = 0; ci < root.clouds.length; ++ci) {
                     var c = root.clouds[ci];
-                    ctx.fillStyle = c.dark ? "rgba(18, 24, 38, 0.55)" : "rgba(180, 195, 220, 0.08)";
+                    if (envLvl === 1)
+                        ctx.fillStyle = c.dark ? "rgba(65, 28, 58, 0.55)" : "rgba(255, 185, 145, 0.14)";
+                    else if (envLvl === 2)
+                        ctx.fillStyle = c.dark ? "rgba(12, 36, 58, 0.55)" : "rgba(175, 235, 255, 0.12)";
+                    else
+                        ctx.fillStyle = c.dark ? "rgba(38, 12, 22, 0.65)" : "rgba(255, 110, 95, 0.12)";
                     ctx.beginPath();
                     ctx.arc(c.x, c.y, 38 * c.s, 0, 6.28);
                     ctx.arc(c.x + 34 * c.s, c.y - 12 * c.s, 45 * c.s, 0, 6.28);
@@ -920,16 +1179,26 @@ ApplicationWindow {
                     ctx.fill();
                 }
 
-                // 3. BACKGROUND OCEAN SWELLS (Behind Ships)
+                // 3. BACKGROUND OCEAN SWELLS (Tinted for Coral Sea / Arctic Strait / Volcanic Red Sea)
                 var seaGrad = ctx.createLinearGradient(0, root.seaLevel - 15, 0, height);
-                seaGrad.addColorStop(0.0, "#13314c");
-                seaGrad.addColorStop(0.4, "#0d253a");
-                seaGrad.addColorStop(1.0, "#071521");
+                if (envLvl === 1) {
+                    seaGrad.addColorStop(0.0, "#1c4e63");
+                    seaGrad.addColorStop(0.4, "#12354a");
+                    seaGrad.addColorStop(1.0, "#081c29");
+                } else if (envLvl === 2) {
+                    seaGrad.addColorStop(0.0, "#15496e");
+                    seaGrad.addColorStop(0.4, "#0c2f4d");
+                    seaGrad.addColorStop(1.0, "#051829");
+                } else {
+                    seaGrad.addColorStop(0.0, "#3d1626");
+                    seaGrad.addColorStop(0.4, "#260d18");
+                    seaGrad.addColorStop(1.0, "#12050b");
+                }
                 ctx.fillStyle = seaGrad;
                 ctx.fillRect(0, root.seaLevel - 8, width, height - root.seaLevel + 16);
 
                 // Rolling back wave layer
-                ctx.fillStyle = "#173c5e";
+                ctx.fillStyle = (envLvl === 3) ? "#4f1c2e" : (envLvl === 2 ? "#1c5d87" : "#225a73");
                 ctx.beginPath();
                 ctx.moveTo(0, height);
                 for (var wx = 0; wx <= width + 40; wx += 40) {
@@ -1033,7 +1302,7 @@ ApplicationWindow {
                 }
 
                 // 5. FOREGROUND ROLLING SEA WAVES & FOAM CRESTS (Covers ship waterlines)
-                ctx.fillStyle = "rgba(18, 55, 88, 0.82)";
+                ctx.fillStyle = (envLvl === 3) ? "rgba(68, 20, 36, 0.84)" : (envLvl === 2 ? "rgba(18, 68, 102, 0.82)" : "rgba(22, 65, 88, 0.82)");
                 ctx.beginPath();
                 ctx.moveTo(0, height);
                 for (var fwx = 0; fwx <= width + 30; fwx += 30) {
@@ -1045,7 +1314,7 @@ ApplicationWindow {
                 ctx.fill();
 
                 // Whitecap wave crests
-                ctx.strokeStyle = "rgba(210, 235, 255, 0.28)";
+                ctx.strokeStyle = (envLvl === 3) ? "rgba(255, 150, 120, 0.32)" : "rgba(210, 235, 255, 0.30)";
                 ctx.lineWidth = 2;
                 ctx.beginPath();
                 for (var cwx = 0; cwx <= width; cwx += 30) {
@@ -1194,17 +1463,29 @@ ApplicationWindow {
                     ctx.fillStyle = root.bossHangarOpen ? "#ff9e64" : "#161922";
                     ctx.fillRect(46, -9, 26, 18);
 
-                    // Boss Name Tag & Health Bar above Boss Aeroplane
+                    // Boss Name Tag & Health Bar above Boss Aeroplane (Shows Phase 2 Enraged state!)
                     ctx.font = "bold 12px sans-serif";
-                    ctx.fillStyle = "#ffd60a";
-                    ctx.fillText("LVL " + bLvl + " BOSS: " + backend.bossName.toUpperCase(), -78, -86);
+                    ctx.fillStyle = root.bossEnraged ? "#ff4d4d" : "#ffd60a";
+                    var phaseTag = root.bossEnraged ? " [PHASE 2 ENRAGED!]" : "";
+                    ctx.fillText("LVL " + bLvl + " BOSS: " + backend.bossName.toUpperCase() + phaseTag, -88, -86);
 
                     ctx.fillStyle = "rgba(0,0,0,0.75)";
-                    ctx.fillRect(-78, -80, 156, 9);
-                    ctx.fillStyle = root.bossShieldActive ? "#bb9af7" : "#ff4d4d";
+                    ctx.fillRect(-88, -80, 176, 9);
+                    ctx.fillStyle = root.bossShieldActive ? "#bb9af7" : (root.bossEnraged ? "#ff9e64" : "#ff4d4d");
                     var hpFrac = Math.max(0, root.bossHealth / root.bossMaxHealth);
-                    ctx.fillRect(-78, -80, 156 * hpFrac, 9);
+                    ctx.fillRect(-88, -80, 176 * hpFrac, 9);
 
+                    ctx.restore();
+                }
+
+                // 7a. PLAYER AUTOCANNON & WINGMAN DRONE PLASMA BOLTS
+                for (var cbi = 0; cbi < root.cannonBolts.length; ++cbi) {
+                    var cb = root.cannonBolts[cbi];
+                    ctx.save();
+                    ctx.fillStyle = cb.color;
+                    ctx.fillRect(cb.x - 10, cb.y - 2, 18, 4);
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillRect(cb.x - 4, cb.y - 1, 10, 2);
                     ctx.restore();
                 }
 
@@ -1518,6 +1799,34 @@ ApplicationWindow {
                 ctx.moveTo(23, 11);  ctx.lineTo(15, 15);  ctx.lineTo(16, 7);  ctx.closePath();
                 ctx.fill();
 
+                // Level 3 Twin Autonomous Wingman Stealth Drones flying in formation beside the B-2 Spirit!
+                if (pTier === 3) {
+                    var droneBob = Math.sin(root.seaTime * 2.2) * 8;
+                    for (var dSide = -1; dSide <= 1; dSide += 2) {
+                        var dyDrone = dSide * 74 + (dSide === -1 ? droneBob : -droneBob);
+                        ctx.save();
+                        ctx.translate(-22, dyDrone);
+                        // Drone plasma thruster
+                        ctx.fillStyle = "#bb9af7";
+                        ctx.fillRect(-16, -2, 8 + Math.random() * 5, 4);
+                        // Mini stealth flying-wing silhouette
+                        ctx.fillStyle = "#363e52";
+                        ctx.strokeStyle = "#7dcfff";
+                        ctx.lineWidth = 1.4;
+                        ctx.beginPath();
+                        ctx.moveTo(16, 0);
+                        ctx.lineTo(-8, -20);
+                        ctx.lineTo(-14, -15);
+                        ctx.lineTo(-9, 0);
+                        ctx.lineTo(-14, 15);
+                        ctx.lineTo(-8, 20);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                }
+
                 // Shield bubble when brushing past enemy planes or deflecting boss shots
                 if (root.invulnerableTicks > 0) {
                     ctx.strokeStyle = (root.invulnerableTicks % 4 < 2) ? "#7dcfff" : theme.accent;
@@ -1722,12 +2031,12 @@ ApplicationWindow {
             }
         }
 
-        // --- LEVEL INTRO BANNER (SHOWS BOSS AEROPLANE & WEAPON CAPABILITY) ---
+        // --- LEVEL INTRO BANNER (SHOWS DISTINCT THEATER, BOSS AEROPLANE & WEAPON CAPABILITY) ---
         Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
-            y: 84
-            width: 560
-            height: 76
+            y: 80
+            width: 640
+            height: 94
             color: "#d916161e"
             border.color: theme.accent
             border.width: 2
@@ -1737,10 +2046,18 @@ ApplicationWindow {
 
             ColumnLayout {
                 anchors.centerIn: parent
-                spacing: 4
+                spacing: 3
 
                 Label {
-                    text: "🎯 " + qsTr("LEVEL %1 BOSS: %2").arg(backend.level).arg(backend.bossName)
+                    text: "🌍 " + qsTr("THEATER %1: %2").arg(backend.level).arg(backend.theaterName)
+                    font.bold: true
+                    font.pixelSize: 13
+                    color: "#9ece6a"
+                    Layout.alignment: Qt.AlignHCenter
+                }
+
+                Label {
+                    text: "🎯 " + qsTr("LEVEL %1 BOSS: %2 (%3 HP)").arg(backend.level).arg(backend.bossName).arg(root.bossMaxHealth)
                     font.bold: true
                     font.pixelSize: 18
                     color: "#ffd60a"

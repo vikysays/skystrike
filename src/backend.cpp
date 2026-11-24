@@ -54,10 +54,10 @@ void Backend::recordShipDestroyed() {
 
 QString Backend::weaponName() const {
     if (m_wave == 1)
-        return QStringLiteral("Tier 1: Heavy Cruise Missile + Bomb");
+        return QStringLiteral("Tier 1: Heavy Cruise Missile + Nose Gatling + Gravity Bomb");
     if (m_wave == 2)
-        return QStringLiteral("Tier 2: Twin Supersonic Missiles + Dual Cluster Bombs");
-    return QStringLiteral("Tier 3: Triple Homing Missiles + Nose Laser + Mega Bombs");
+        return QStringLiteral("Tier 2: Twin Homing Missiles + Twin Wing Autocannons + Cluster Bombs");
+    return QStringLiteral("Tier 3: Triple Homing Missiles + Nose Plasma Laser + Wingman Drones + Mega Bombs");
 }
 
 QString Backend::bossName() const {
@@ -66,6 +66,14 @@ QString Backend::bossName() const {
     if (m_wave == 2)
         return QStringLiteral("Storm Valkyrie Gunship");
     return QStringLiteral("Sky Titan Dreadnought");
+}
+
+QString Backend::theaterName() const {
+    if (m_wave == 1)
+        return QStringLiteral("Coral Sea Sunset Archipelago");
+    if (m_wave == 2)
+        return QStringLiteral("Arctic Aurora Glacier Strait");
+    return QStringLiteral("Volcanic Lightning Red Sea");
 }
 
 void Backend::recordMothershipDefeated() {

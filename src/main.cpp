@@ -68,6 +68,7 @@ int runCli(int argc, char *argv[]) {
             {QStringLiteral("weaponTier"), backend.weaponTier()},
             {QStringLiteral("weaponName"), backend.weaponName()},
             {QStringLiteral("bossName"), backend.bossName()},
+            {QStringLiteral("theaterName"), backend.theaterName()},
             {QStringLiteral("wave"), backend.wave()}
         };
         if (jsonOut) {
@@ -76,6 +77,7 @@ int runCli(int argc, char *argv[]) {
             QTextStream(stdout) << "Sky Strike Stats:\n"
                                 << "  High Score: " << backend.highScore() << "\n"
                                 << "  Current Level: " << backend.level() << " / " << backend.maxLevels() << "\n"
+                                << "  Theater: " << backend.theaterName() << "\n"
                                 << "  Weapon System: " << backend.weaponName() << "\n"
                                 << "  Target Boss: " << backend.bossName() << "\n"
                                 << "  Ships Sunk: " << backend.shipsDestroyed() << "\n"
